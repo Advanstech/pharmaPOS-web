@@ -2,6 +2,8 @@
 
 This document summarizes what the **Next.js web app** (`PharmaPOS-web`) expects from the **GraphQL API** (e.g. Railway) so both sides stay aligned. Share this with backend engineers.
 
+**Official product API reference (GraphQL surfaces, auth, AI, errors):** see [DEVELOPER_API_REFERENCE.md](./DEVELOPER_API_REFERENCE.md), including **PharmaPOS Web (this repo) — alignment** for how illustrative examples map to `src/lib/graphql/` operations.
+
 ---
 
 ## 1. Environments, proxy, and CORS

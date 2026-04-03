@@ -256,7 +256,7 @@ export default function PricingPage() {
           onValueChange={setQuery}
           iconSize={15}
           placeholder="Search product name, generic or barcode..."
-          className="w-full rounded-lg py-2 pl-9 pr-10 text-sm outline-none"
+          className="w-full rounded-lg py-2 pr-10 text-sm outline-none"
           style={{
             background: 'var(--surface-card)',
             border: '1px solid var(--surface-border)',
