@@ -23,9 +23,11 @@ const nextConfig: NextConfig = {
 
   turbopack: {},
 
-  // Anchor output file tracing to the monorepo root so Turbopack doesn't
-  // walk past it and pick up ~/package-lock.json as the workspace root
-  outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  // Must be this app root on Vercel; `../..` resolves incorrectly and breaks the deploy step.
+  // For a local monorepo layout, set NEXT_OUTPUT_FILE_TRACING_ROOT to the workspace root.
+  outputFileTracingRoot: process.env.NEXT_OUTPUT_FILE_TRACING_ROOT
+    ? path.resolve(process.env.NEXT_OUTPUT_FILE_TRACING_ROOT)
+    : path.resolve(__dirname),
 
   experimental: {},
 
