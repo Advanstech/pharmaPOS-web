@@ -5,7 +5,8 @@
   "author": "Hanson Peprah from Advansis Technologies",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

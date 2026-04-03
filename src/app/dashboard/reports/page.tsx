@@ -15,14 +15,15 @@ import { formatApolloError } from '@/lib/apollo/format-apollo-error';
 type Period = '7d' | '30d' | '90d';
 const DAYS_BY_PERIOD: Record<Period, number> = { '7d': 7, '30d': 30, '90d': 90 };
 
-function fmtIsoDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+/** Calendar YYYY-MM-DD in Africa/Accra — matches how sales/revenue are stored for the branch. */
+function fmtAccraDate(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
 }
 
 function getRanges(period: Period): { start: string; end: string; prevStart: string; prevEnd: string } {
   const days = DAYS_BY_PERIOD[period];
   const end = new Date();
-  const start = new Date();
+  const start = new Date(end);
   start.setDate(end.getDate() - (days - 1));
 
   const prevEnd = new Date(start);
@@ -31,10 +32,10 @@ function getRanges(period: Period): { start: string; end: string; prevStart: str
   prevStart.setDate(prevEnd.getDate() - (days - 1));
 
   return {
-    start: fmtIsoDate(start),
-    end: fmtIsoDate(end),
-    prevStart: fmtIsoDate(prevStart),
-    prevEnd: fmtIsoDate(prevEnd),
+    start: fmtAccraDate(start),
+    end: fmtAccraDate(end),
+    prevStart: fmtAccraDate(prevStart),
+    prevEnd: fmtAccraDate(prevEnd),
   };
 }
 

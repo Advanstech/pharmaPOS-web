@@ -30,13 +30,6 @@ const nextConfig: NextConfig = {
     : path.resolve(__dirname),
 
   experimental: {},
-
-  /** Proxy GraphQL so the browser hits the Next origin (fixes LAN / phone dev vs localhost API). */
-  async rewrites() {
-    const target = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:4000';
-    const base = target.replace(/\/$/, '');
-    return [{ source: '/api/graphql', destination: `${base}/graphql` }];
-  },
 };
 
 export default withPWA({

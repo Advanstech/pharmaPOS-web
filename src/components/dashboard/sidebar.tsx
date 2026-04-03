@@ -7,6 +7,7 @@ import { ShoppingCart, LogOut, Stethoscope, ChevronLeft, ChevronRight } from 'lu
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { DASHBOARD_NAV } from '@/lib/auth/dashboard-nav';
+import { roleForAccess } from '@/lib/auth/post-login-path';
 import { useRef, useState } from 'react';
 import { useNestedLenis } from '@/lib/lenis/use-nested-lenis';
 
@@ -19,9 +20,8 @@ export function Sidebar() {
   const navListRef = useRef<HTMLUListElement>(null);
   const prefersReducedMotion = useReducedMotion();
 
-  const visibleNav = DASHBOARD_NAV.filter(
-    (item) => user && item.roles.includes(user.role),
-  );
+  const accessRole = user ? roleForAccess(user.role) : null;
+  const visibleNav = DASHBOARD_NAV.filter((item) => accessRole && item.roles.includes(accessRole));
 
   useNestedLenis(navScrollRef, navListRef, {
     enabled: !prefersReducedMotion,

@@ -510,9 +510,15 @@ export default function StaffPage() {
   const [detailTarget, setDetailTarget] = useState<StaffMember | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(true);
 
-  const { data, loading, refetch } = useQuery<{ listStaff: StaffMember[] }>(LIST_STAFF, {
+  const {
+    data,
+    loading,
+    refetch,
+    error: listStaffError,
+  } = useQuery<{ listStaff: StaffMember[] }>(LIST_STAFF, {
     skip: !user,
-    pollInterval: 30_000, // refresh on-duty status every 30s
+    variables: user?.branch_id ? { branchId: user.branch_id } : {},
+    pollInterval: 30_000,
   });
 
   const { data: sessionData, loading: sessionLoading, error: sessionError } =
@@ -580,6 +586,15 @@ export default function StaffPage() {
 
   return (
     <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      {listStaffError ? (
+        <div
+          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          role="alert"
+        >
+          <p className="font-semibold">Could not load staff</p>
+          <p className="mt-1 text-xs font-medium">{formatApolloError(listStaffError)}</p>
+        </div>
+      ) : null}
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>

@@ -22,17 +22,34 @@ export function postLoginPathForRole(role: string): string {
   }
 }
 
+const ALLOWED_ROLES: UserRole[] = [
+  'owner',
+  'se_admin',
+  'manager',
+  'head_pharmacist',
+  'pharmacist',
+  'technician',
+  'cashier',
+  'chemical_cashier',
+];
+
+/** Normalize API / JWT role strings (e.g. Owner, SE_ADMIN, chemical cashier) for RBAC. */
+export function normalizeRoleString(role: string | undefined | null): string {
+  if (!role) return '';
+  return role
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
+
 /** Narrow API / store role string to our union when known. */
 export function asUserRole(role: string): UserRole | null {
-  const allowed: UserRole[] = [
-    'owner',
-    'se_admin',
-    'manager',
-    'head_pharmacist',
-    'pharmacist',
-    'technician',
-    'cashier',
-    'chemical_cashier',
-  ];
-  return (allowed as string[]).includes(role) ? (role as UserRole) : null;
+  const r = normalizeRoleString(role);
+  return (ALLOWED_ROLES as string[]).includes(r) ? (r as UserRole) : null;
+}
+
+/** Safe role for sidebar + route guards when persisted user.role may vary in casing. */
+export function roleForAccess(role: string | undefined | null): UserRole | null {
+  if (!role) return null;
+  return asUserRole(role);
 }

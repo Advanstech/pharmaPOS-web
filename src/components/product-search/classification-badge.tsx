@@ -13,7 +13,7 @@ const CONFIG: Record<string, { label: string; bg: string; text: string; icon: st
     icon: '✓',
   },
   POM: {
-    label: 'POM ℞',
+    label: 'POM',
     bg: 'rgba(217,119,6,0.1)',
     text: '#b45309',
     icon: '℞',
@@ -31,12 +31,14 @@ export function ClassificationBadge({ classification }: ClassificationBadgeProps
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide"
+      className="inline-flex max-w-full shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wide sm:gap-1 sm:px-2 sm:text-[11px]"
       style={{ background: cfg.bg, color: cfg.text }}
       aria-label={`Classification: ${cfg.label}`}
     >
-      <span aria-hidden="true">{cfg.icon}</span>
-      {cfg.label}
+      <span aria-hidden="true" className="shrink-0 text-[0.65rem] sm:text-[0.7rem]">
+        {cfg.icon}
+      </span>
+      <span className="truncate">{cfg.label}</span>
     </span>
   );
 }

@@ -90,7 +90,8 @@ export function CashierView({ user }: CashierViewProps) {
   const itemsSold = mine.reduce((sum, s) => sum + s.items.reduce((q, i) => q + i.quantity, 0), 0);
   const txnCount = mine.length;
 
-  const recent = mine.slice(0, 4).map((s) => ({
+  /** Latest 2 for the widget; full history is on /dashboard/transactions (Sales). */
+  const recent = mine.slice(0, 2).map((s) => ({
     id: s.id,
     total: s.totalPesewas,
     time: new Date(s.createdAt).toLocaleTimeString('en-GH', {
@@ -258,7 +259,7 @@ export function CashierView({ user }: CashierViewProps) {
                 <p className="text-sm text-content-muted">No recent sales to show yet.</p>
               </div>
             ) : (
-              recent.slice(0, 3).map((tx) => (
+              recent.map((tx) => (
                 <Link
                   key={tx.id}
                   href={`/dashboard/transactions/${tx.id}`}

@@ -6,12 +6,11 @@ import { useReducedMotion } from 'framer-motion';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { canAccessDashboardPath } from '@/lib/auth/dashboard-route-access';
-import { postLoginPathForRole } from '@/lib/auth/post-login-path';
+import { postLoginPathForRole, roleForAccess } from '@/lib/auth/post-login-path';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { useNestedLenis } from '@/lib/lenis/use-nested-lenis';
 import { OfflineBanner } from '@/components/pos/offline-banner';
-import type { UserRole } from '@/types';
 
 function DashboardAuthLoading() {
   return (
@@ -42,13 +41,15 @@ export function DashboardAuthShell({ children }: { children: React.ReactNode }) 
     syncTouch: true,
   });
 
+  const accessRole = user ? roleForAccess(user.role) : null;
   const allowed =
-    !!user && canAccessDashboardPath(user.role as UserRole, pathname ?? '/dashboard');
+    !!accessRole && canAccessDashboardPath(accessRole, pathname ?? '/dashboard');
 
   useEffect(() => {
     if (!ready || !user) return;
-    if (!canAccessDashboardPath(user.role as UserRole, pathname ?? '/dashboard')) {
-      router.replace(postLoginPathForRole(user.role));
+    const r = roleForAccess(user.role);
+    if (!r || !canAccessDashboardPath(r, pathname ?? '/dashboard')) {
+      router.replace(postLoginPathForRole(r ?? user.role));
     }
   }, [ready, user, pathname, router]);
 

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useLazyQuery, useQuery } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Receipt, TrendingUp, ShoppingBag, DollarSign,
-  Printer, Clock, ChevronRight,
+  Printer, Clock, ChevronRight, Filter, X,
 } from 'lucide-react';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { formatGhs } from '@/lib/utils';
@@ -103,6 +103,70 @@ function stockPillStyle(status: string): { bg: string; color: string } {
   }
 }
 
+function accraDateKey(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
+}
+
+function saleMatchesDateRange(tx: SaleRow, fromYmd: string, toYmd: string): boolean {
+  const whenIso = tx.soldAt ?? tx.createdAt;
+  const key = accraDateKey(whenIso);
+  if (fromYmd && key < fromYmd) return false;
+  if (toYmd && key > toYmd) return false;
+  return true;
+}
+
+function saleMatchesClassificationFilter(tx: SaleRow, filter: string): boolean {
+  if (!filter) return true;
+  const items = tx.items;
+  if (items.length === 0) return filter === 'otc_only';
+  const cls = (c: string | undefined) => (c ?? 'OTC').trim();
+  if (filter === 'otc_only') {
+    return items.every((i) => cls(i.classification) === 'OTC');
+  }
+  if (filter === 'has_pom') {
+    return items.some((i) => cls(i.classification) === 'POM');
+  }
+  if (filter === 'has_controlled') {
+    return items.some((i) => cls(i.classification) === 'CONTROLLED');
+  }
+  if (filter === 'rx_any') {
+    return items.some((i) => {
+      const c = cls(i.classification);
+      return c === 'POM' || c === 'CONTROLLED';
+    });
+  }
+  return true;
+}
+
+function saleMatchesStockFilter(tx: SaleRow, filter: string): boolean {
+  if (!filter) return true;
+  const worst = worstStockMeta(tx.items).label;
+  return worst === filter;
+}
+
+function saleMatchesSupplierFilter(tx: SaleRow, supplier: string): boolean {
+  if (!supplier) return true;
+  return tx.items.some((i) => (i.supplierName ?? '').trim() === supplier);
+}
+
+function saleMatchesCashierFilter(tx: SaleRow, cashierId: string): boolean {
+  if (!cashierId) return true;
+  return tx.cashierId === cashierId;
+}
+
+function saleMatchesBranchFilter(tx: SaleRow, branchId: string): boolean {
+  if (!branchId) return true;
+  return tx.branchId === branchId;
+}
+
+const inputStyle: CSSProperties = {
+  background: 'var(--surface-card)',
+  border: '1px solid var(--surface-border)',
+  color: 'var(--text-primary)',
+};
+
+const labelStyle: CSSProperties = { color: 'var(--text-muted)' };
+
 /** Matches `recentSales` @Roles on the API */
 const RECENT_SALES_ROLES = [
   'cashier',
@@ -118,6 +182,13 @@ export default function TransactionsPage() {
   const shouldReduceMotion = useReducedMotion();
   const { user } = useAuthStore();
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [cashierFilter, setCashierFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [receiptError, setReceiptError] = useState<string | null>(null);
@@ -161,10 +232,51 @@ export default function TransactionsPage() {
     return '';
   }, [visibleSales, user?.branch_id]);
 
+  const filterOptions = useMemo(() => {
+    const supplierSet = new Set<string>();
+    const cashierMap = new Map<string, string>();
+    const branchMap = new Map<string, string>();
+    for (const tx of visibleSales) {
+      for (const it of tx.items) {
+        const sn = (it.supplierName ?? '').trim();
+        if (sn) supplierSet.add(sn);
+      }
+      if (tx.cashierId) {
+        cashierMap.set(tx.cashierId, (tx.cashierName ?? tx.cashierId).trim() || tx.cashierId);
+      }
+      branchMap.set(tx.branchId, (tx.branchName ?? tx.branchId).trim() || tx.branchId);
+    }
+    const suppliers = [...supplierSet].sort((a, b) => a.localeCompare(b));
+    const cashiers = [...cashierMap.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const branches = [...branchMap.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { suppliers, cashiers, branches };
+  }, [visibleSales]);
+
+  const hasStructuredFilters =
+    !!dateFrom ||
+    !!dateTo ||
+    !!classificationFilter ||
+    !!stockFilter ||
+    !!supplierFilter ||
+    !!cashierFilter ||
+    !!branchFilter;
+
   const filtered = useMemo(() => {
+    let rows = visibleSales;
+    rows = rows.filter((tx) => saleMatchesDateRange(tx, dateFrom, dateTo));
+    rows = rows.filter((tx) => saleMatchesClassificationFilter(tx, classificationFilter));
+    rows = rows.filter((tx) => saleMatchesStockFilter(tx, stockFilter));
+    rows = rows.filter((tx) => saleMatchesSupplierFilter(tx, supplierFilter));
+    rows = rows.filter((tx) => saleMatchesCashierFilter(tx, cashierFilter));
+    rows = rows.filter((tx) => saleMatchesBranchFilter(tx, branchFilter));
+
     const q = search.trim().toLowerCase();
-    if (!q) return visibleSales;
-    return visibleSales.filter((tx) => {
+    if (!q) return rows;
+    return rows.filter((tx) => {
       if (tx.id.toLowerCase().includes(q)) return true;
       if (tx.branchId.toLowerCase().includes(q)) return true;
       if (tx.branchName?.toLowerCase().includes(q)) return true;
@@ -177,22 +289,50 @@ export default function TransactionsPage() {
           (i.supplierName ?? '').toLowerCase().includes(q),
       );
     });
-  }, [visibleSales, search]);
+  }, [
+    visibleSales,
+    search,
+    dateFrom,
+    dateTo,
+    classificationFilter,
+    stockFilter,
+    supplierFilter,
+    cashierFilter,
+    branchFilter,
+  ]);
 
-  const shiftTotal = visibleSales.reduce((sum, tx) => sum + tx.totalPesewas, 0);
-  const itemsSold = visibleSales.reduce(
+  const shiftTotal = filtered.reduce((sum, tx) => sum + tx.totalPesewas, 0);
+  const itemsSold = filtered.reduce(
     (sum, tx) => sum + tx.items.reduce((q, i) => q + i.quantity, 0),
     0,
   );
-  const avgTransaction = visibleSales.length ? Math.round(shiftTotal / visibleSales.length) : 0;
+  const avgTransaction = filtered.length ? Math.round(shiftTotal / filtered.length) : 0;
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginatedSales = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Reset to page 1 when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [search]);
+  }, [
+    search,
+    dateFrom,
+    dateTo,
+    classificationFilter,
+    stockFilter,
+    supplierFilter,
+    cashierFilter,
+    branchFilter,
+  ]);
+
+  function clearStructuredFilters() {
+    setDateFrom('');
+    setDateTo('');
+    setClassificationFilter('');
+    setStockFilter('');
+    setSupplierFilter('');
+    setCashierFilter('');
+    setBranchFilter('');
+  }
 
   async function handleReprint(saleId: string): Promise<void> {
     setReceiptError(null);
@@ -341,9 +481,9 @@ export default function TransactionsPage() {
         </Link>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         <SearchFieldWithClear
-          wrapperClassName="max-w-sm"
+          wrapperClassName="w-full max-w-sm shrink-0"
           value={search}
           onValueChange={setSearch}
           iconSize={15}
@@ -356,6 +496,163 @@ export default function TransactionsPage() {
             color: 'var(--text-primary)',
           }}
         />
+        {hasStructuredFilters ? (
+          <button
+            type="button"
+            onClick={clearStructuredFilters}
+            className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ color: 'var(--text-secondary)', borderColor: 'var(--surface-border)' }}
+          >
+            <X size={16} aria-hidden />
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className="mb-6 rounded-2xl p-4 sm:p-5"
+        style={{
+          background: 'var(--surface-card)',
+          border: '1px solid var(--surface-border)',
+          boxShadow: 'var(--shadow-card)',
+        }}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <Filter size={16} className="text-teal" aria-hidden />
+          <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>
+            Filters
+          </h2>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            (Accra dates · applies to loaded sales)
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div>
+            <label htmlFor="tx-date-from" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+              From date
+            </label>
+            <input
+              id="tx-date-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full min-h-[42px] rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label htmlFor="tx-date-to" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+              To date
+            </label>
+            <input
+              id="tx-date-to"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full min-h-[42px] rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label htmlFor="tx-classification" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+              Product types
+            </label>
+            <select
+              id="tx-classification"
+              value={classificationFilter}
+              onChange={(e) => setClassificationFilter(e.target.value)}
+              className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+              style={inputStyle}
+            >
+              <option value="">All types</option>
+              <option value="rx_any">Has Rx (POM or controlled)</option>
+              <option value="otc_only">OTC only (all lines)</option>
+              <option value="has_pom">Has POM</option>
+              <option value="has_controlled">Has controlled</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="tx-stock" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+              Worst stock in sale
+            </label>
+            <select
+              id="tx-stock"
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+              className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+              style={inputStyle}
+            >
+              <option value="">All levels</option>
+              <option value="ok">OK</option>
+              <option value="low">Low</option>
+              <option value="critical">Critical</option>
+              <option value="out">Out</option>
+            </select>
+          </div>
+          {filterOptions.suppliers.length > 0 ? (
+            <div>
+              <label htmlFor="tx-supplier" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+                Supplier
+              </label>
+              <select
+                id="tx-supplier"
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+                style={inputStyle}
+              >
+                <option value="">All suppliers</option>
+                {filterOptions.suppliers.map((s) => (
+                  <option key={s} value={s}>
+                    {s.length > 48 ? `${s.slice(0, 46)}…` : s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          {branchWideSales && filterOptions.branches.length > 1 ? (
+            <div>
+              <label htmlFor="tx-branch" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+                Branch
+              </label>
+              <select
+                id="tx-branch"
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+                style={inputStyle}
+              >
+                <option value="">All branches</option>
+                {filterOptions.branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          {branchWideSales && filterOptions.cashiers.length > 0 ? (
+            <div>
+              <label htmlFor="tx-cashier" className="mb-1 block text-xs font-semibold" style={labelStyle}>
+                Cashier
+              </label>
+              <select
+                id="tx-cashier"
+                value={cashierFilter}
+                onChange={(e) => setCashierFilter(e.target.value)}
+                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
+                style={inputStyle}
+              >
+                <option value="">All cashiers</option>
+                {filterOptions.cashiers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
       </div>
       {receiptError && (
         <div
@@ -517,9 +814,11 @@ export default function TransactionsPage() {
             {!loading && paginatedSales.length === 0 && (
               <tr>
                 <td colSpan={tableColCount} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {branchWideSales
-                    ? 'No completed branch sales in the recent window.'
-                    : 'No completed sales for your cashier ID in the recent window.'}
+                  {visibleSales.length === 0
+                    ? branchWideSales
+                      ? 'No completed branch sales in the recent window.'
+                      : 'No completed sales for your cashier ID in the recent window.'
+                    : 'No sales match your search and filters. Try widening dates or clearing filters.'}
                 </td>
               </tr>
             )}
