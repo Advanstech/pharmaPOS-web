@@ -30,6 +30,23 @@ const nextConfig: NextConfig = {
     : path.resolve(__dirname),
 
   experimental: {},
+
+  /**
+   * Proxy API routes (browser stays same-origin; avoids CORS on GraphQL).
+   * Backend serves `/graphql`, `/health`, `/health/live` on `API_PROXY_TARGET`.
+   */
+  async rewrites() {
+    const target =
+      process.env.API_PROXY_TARGET?.trim() ||
+      process.env.NEXT_PUBLIC_API_URL?.trim() ||
+      'http://127.0.0.1:4000';
+    const base = target.replace(/\/$/, '');
+    return [
+      { source: '/api/graphql', destination: `${base}/graphql` },
+      { source: '/api/health', destination: `${base}/health` },
+      { source: '/api/health/live', destination: `${base}/health/live` },
+    ];
+  },
 };
 
 export default withPWA({
@@ -42,7 +59,7 @@ export default withPWA({
   workboxOptions: {
     runtimeCaching: [
       {
-        urlPattern: /^https?:\/\/.*\/graphql/,
+        urlPattern: /\/api\/graphql$/,
         handler: 'NetworkFirst',
         options: {
           cacheName: 'graphql-cache',

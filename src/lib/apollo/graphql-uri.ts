@@ -1,8 +1,16 @@
 /**
- * GraphQL endpoints. `NEXT_PUBLIC_API_URL` is the API **base** (e.g. `https://…railway.app` — no path).
- * `/graphql` is appended (Nest default). Omit env for local `http://127.0.0.1:4000/graphql`.
+ * GraphQL HTTP/WS URIs.
  *
- * Optional `NEXT_PUBLIC_WS_URL`: same kind of base; if unset, derived from `NEXT_PUBLIC_API_URL`.
+ * **HTTP:** The browser always calls same-origin `/api/graphql`. `next.config` rewrites that to
+ * `API_PROXY_TARGET` + `/graphql` (same pattern as dev: Next on :3000 → API on :4000).
+ * The API host owns `/graphql`, `/health`, `/health/live` — we do not reimplement those here.
+ *
+ * **SSR / server:** Uses `API_PROXY_TARGET` (or `http://127.0.0.1:4000`) and hits `/graphql` directly.
+ *
+ * Env:
+ * - `API_PROXY_TARGET` — backend base only, e.g. `http://127.0.0.1:4000` or `https://….up.railway.app` (no `/graphql`).
+ * - `NEXT_PUBLIC_WS_URL` or `NEXT_PUBLIC_API_URL` — optional public base for WebSocket (subscriptions);
+ *   HTTP does not use these for the browser (avoids CORS on GraphQL POST).
  */
 function withGraphqlPath(base: string): string {
   const b = base.replace(/\/$/, '');
@@ -17,16 +25,27 @@ function httpOriginToWsOrigin(base: string): string {
   return b;
 }
 
+function serverGraphqlUrl(): string {
+  const base =
+    process.env.API_PROXY_TARGET?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    'http://127.0.0.1:4000';
+  return withGraphqlPath(base);
+}
+
 export function getGraphqlHttpUri(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (base) return withGraphqlPath(base);
-  return withGraphqlPath('http://127.0.0.1:4000');
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/graphql`;
+  }
+  return serverGraphqlUrl();
 }
 
 export function getGraphqlWsUri(): string {
-  const wsBase = process.env.NEXT_PUBLIC_WS_URL?.trim();
-  if (wsBase) return withGraphqlPath(wsBase);
-  const base = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (base) return withGraphqlPath(httpOriginToWsOrigin(base));
-  return withGraphqlPath('ws://127.0.0.1:4000');
+  const wsOverride = process.env.NEXT_PUBLIC_WS_URL?.trim();
+  const pubBase = wsOverride || process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (pubBase) {
+    const asHttp = pubBase.replace(/^wss:\/\//i, 'https://').replace(/^ws:\/\//i, 'http://');
+    return withGraphqlPath(httpOriginToWsOrigin(asHttp));
+  }
+  return withGraphqlPath(httpOriginToWsOrigin(serverGraphqlUrl()));
 }

@@ -4,20 +4,19 @@ This document summarizes what the **Next.js web app** (`PharmaPOS-web`) expects 
 
 ---
 
-## 1. Environments and CORS
+## 1. Environments, proxy, and CORS
 
 | Item | Detail |
 |------|--------|
-| **Frontend** | Deployed on Vercel (e.g. `https://<project>.vercel.app`). |
-| **API** | Public HTTPS URL (e.g. `https://*.up.railway.app`). |
-| **Browser behavior** | The SPA calls the API **directly** from the browser (`NEXT_PUBLIC_API_URL` = API base; paths append `/graphql`). |
+| **Frontend** | Next.js on Vercel (e.g. `https://<project>.vercel.app`). App routes: `/login`, `/pos`, `/dashboard`, etc. |
+| **API** | Same as local dev: backend base URL (e.g. `https://*.up.railway.app` or `http://127.0.0.1:4000`). The API owns **`/graphql`**, **`/health`**, **`/health/live`** on that host. |
+| **Browser → GraphQL HTTP** | The SPA calls **same-origin** `https://<vercel>/api/graphql`. Next.js **rewrites** that to `{API_PROXY_TARGET}/graphql` (same idea as dev: browser → Next :3000 → API :4000). **No browser CORS** required for GraphQL POST. |
 
-**Required:** Enable **CORS** on the GraphQL HTTP endpoint so browsers can POST from the Vercel origin:
+**Vercel env:** set **`API_PROXY_TARGET`** to the API base (no `/graphql`), e.g. `https://happy-happiness-production-fd76.up.railway.app`.
 
-- `Access-Control-Allow-Origin`: the Vercel app origin (or validated list), **not** `*` if credentials/JWT headers are used.
-- Allow `POST`, `OPTIONS` (preflight), and headers the client sends: `Content-Type`, `Authorization`, etc.
+**Optional rewrites** (same `API_PROXY_TARGET`): `/api/health` → `/health`, `/api/health/live` → `/health/live` so the UI can probe health same-origin if needed.
 
-**WebSocket (subscriptions):** If the app uses `graphql-ws` to the Railway URL, ensure WebSocket **Origin** checks allow the Vercel origin.
+**WebSocket (subscriptions):** Still a **direct** `wss://…/graphql` from the browser unless you add a WS proxy. Set **`NEXT_PUBLIC_WS_URL`** or **`NEXT_PUBLIC_API_URL`** (public base) for WS, and ensure the API allows that **Origin** for the upgrade if required.
 
 ---
 
