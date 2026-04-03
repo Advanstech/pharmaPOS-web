@@ -1,0 +1,633 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Brand tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --color-teal:        #006D77;
+  --color-teal-dark:   #004E57;
+  --color-teal-light:  #C8E6EA;
+  --color-gold:        #E8A838;
+  --color-gold-surface:#FDF3DC;
+
+  /* Classification */
+  --color-otc:        #16a34a;
+  --color-pom:        #d97706;
+  --color-controlled: #dc2626;
+
+  /* Stock bar */
+  --color-stock-high: #16a34a;
+  --color-stock-mid:  #d97706;
+  --color-stock-low:  #dc2626;
+
+  /* Surfaces */
+  --surface-base:     #F8FAFB;
+  --surface-card:     #FFFFFF;
+  --surface-border:   #E8EDF0;
+  --surface-hover:    #F0F7F8;
+
+  /* Text */
+  --text-primary:     #0D1B1E;
+  --text-secondary:   #4A6670;
+  --text-muted:       #8BA3AB;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0,109,119,0.06), 0 4px 16px rgba(0,109,119,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,109,119,0.12), 0 12px 32px rgba(0,109,119,0.08);
+  --shadow-modal: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+
+  /* Fonts */
+  --font-inter: 'Inter Variable', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Radius */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px;
+
+  /* Charts — comparison bar (e.g. prior period) must stay visible on light cards */
+  --chart-prior-revenue: #64748b;
+  --chart-prior-revenue-stroke: rgba(15, 23, 42, 0.2);
+
+  /* Stock status pills — solid tints read clearly on light cards (was ~12% rgba wash) */
+  --stock-pill-out-bg: #fecaca;
+  --stock-pill-out-fg: #7f1d1d;
+  --stock-pill-critical-bg: #fecaca;
+  --stock-pill-critical-fg: #991b1b;
+  --stock-pill-low-bg: #fde68a;
+  --stock-pill-low-fg: #78350f;
+  --stock-pill-ok-bg: #bbf7d0;
+  --stock-pill-ok-fg: #14532d;
+
+  /* Table row action buttons — borders visible on white/light gray */
+  --action-outline-teal: rgba(0, 109, 119, 0.55);
+  --action-outline-neutral: rgba(74, 102, 112, 0.5);
+}
+
+html {
+  color-scheme: light;
+}
+
+/* ── Dark mode (user choice: Settings, or system via `html.dark`) ─────────── */
+html.dark {
+  color-scheme: dark;
+
+  --color-teal:        #4DB6C1;
+  --color-teal-dark:   #C8E6EA;
+  --color-teal-light:  #003D45;
+
+  --surface-base:      #0A1518;
+  --surface-card:      #111E22;
+  --surface-border:    #1E3038;
+  --surface-hover:     #162428;
+
+  --text-primary:      #E8F4F6;
+  --text-secondary:    #7BADB8;
+  --text-muted:        #3D6470;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.4), 0 12px 32px rgba(0,0,0,0.3);
+
+  /* Prior bar: opaque cool gray so it never disappears on dark cards */
+  --chart-prior-revenue: #9eb6c4;
+  --chart-prior-revenue-stroke: rgba(232, 244, 246, 0.22);
+
+  --stock-pill-out-bg: rgba(248, 113, 113, 0.24);
+  --stock-pill-out-fg: #fecaca;
+  --stock-pill-critical-bg: rgba(248, 113, 113, 0.2);
+  --stock-pill-critical-fg: #fca5a5;
+  --stock-pill-low-bg: rgba(251, 191, 36, 0.22);
+  --stock-pill-low-fg: #fde68a;
+  --stock-pill-ok-bg: rgba(74, 222, 128, 0.2);
+  --stock-pill-ok-fg: #bbf7d0;
+
+  --action-outline-teal: rgba(77, 182, 193, 0.55);
+  --action-outline-neutral: rgba(123, 173, 184, 0.45);
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-inter);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Text selection: Recharts / dark UI often left default black-on-blue; keep readable on dark surfaces */
+::selection {
+  background: rgba(0, 109, 119, 0.22);
+  color: var(--text-primary);
+}
+
+html.dark ::selection {
+  background: rgba(77, 182, 193, 0.35);
+  color: #ffffff;
+}
+
+/* Recharts default tooltip rows ignore parent color — align with theme */
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: var(--text-secondary) !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item-name,
+.recharts-default-tooltip .recharts-tooltip-item-separator,
+.recharts-default-tooltip .recharts-tooltip-item-value {
+  color: var(--text-primary) !important;
+}
+
+html.dark .recharts-default-tooltip .recharts-tooltip-item-name,
+html.dark .recharts-default-tooltip .recharts-tooltip-item-separator,
+html.dark .recharts-default-tooltip .recharts-tooltip-item-value {
+  color: #ffffff !important;
+}
+
+html.dark .recharts-default-tooltip .recharts-tooltip-label {
+  color: rgba(232, 244, 246, 0.75) !important;
+}
+
+/* Lenis smooth scroll */
+html.lenis { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto; }
+
+/* ── Skeleton loader ──────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-border) 25%,
+    var(--surface-hover) 50%,
+    var(--surface-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Shake animation (error states) ──────────────────────────────────────── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%       { transform: translateX(-6px); }
+  30%       { transform: translateX(6px); }
+  45%       { transform: translateX(-4px); }
+  60%       { transform: translateX(4px); }
+  75%       { transform: translateX(-2px); }
+  90%       { transform: translateX(2px); }
+}
+.animate-shake { animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+/* ── Pulse slow (reorder button) ─────────────────────────────────────────── */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+.animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+
+/* ── Shared input ─────────────────────────────────────────────────────────── */
+.input {
+  @apply w-full rounded-xl border bg-surface-card px-4 py-2.5 text-sm outline-none transition-all;
+  border-color: var(--surface-border);
+  color: var(--text-primary);
+}
+.input:focus {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 3px rgba(0,109,119,0.12);
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.card:hover { box-shadow: var(--shadow-card-hover); }
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+/* Hide scrollbar for nav menus but keep functionality */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-teal-light); }
+
+/* ── Touch & Smooth Scrolling ────────────────────────────────────────────── */
+html, body {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none; /* Prevent pull-to-refresh bounce on POS */
+}
+
+/* Enable smooth scrolling for all scrollable containers */
+.overflow-y-auto, .overflow-x-auto, .overflow-auto {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Focus ring ───────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+/* ── Glassmorphism utility ────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.4);
+}
+html.dark .glass {
+  background: rgba(17,30,34,0.80);
+  border-color: rgba(255,255,255,0.08);
+}
+
+/* ── POS layout helpers ───────────────────────────────────────────────────── */
+.pos-left  { width: 60%; }
+.pos-right { width: 40%; }
+
+/* ── Teal gradient text ───────────────────────────────────────────────────── */
+.text-gradient-teal {
+  background: linear-gradient(135deg, var(--color-teal) 0%, #00A3B0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOGIN PAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Full-screen teal-to-dark gradient background */
+.login-root {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #003840 0%, #004E57 40%, #006D77 75%, #00838F 100%);
+}
+
+/* Animated background blobs */
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: blob-drift 12s ease-in-out infinite alternate;
+}
+.login-blob-1 {
+  width: 520px; height: 520px;
+  top: -160px; right: -120px;
+  background: radial-gradient(circle, rgba(0,163,176,0.35) 0%, transparent 70%);
+  animation-delay: 0s;
+}
+.login-blob-2 {
+  width: 400px; height: 400px;
+  bottom: -100px; left: -80px;
+  background: radial-gradient(circle, rgba(232,168,56,0.2) 0%, transparent 70%);
+  animation-delay: -4s;
+}
+.login-blob-3 {
+  width: 300px; height: 300px;
+  top: 40%; left: 30%;
+  background: radial-gradient(circle, rgba(0,109,119,0.25) 0%, transparent 70%);
+  animation-delay: -8s;
+}
+@keyframes blob-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(30px, -20px) scale(1.08); }
+  100% { transform: translate(-20px, 30px) scale(0.95); }
+}
+
+/* Subtle dot-grid overlay */
+.login-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Card wrapper */
+.login-card-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  z-index: 10;
+}
+
+/* The card itself */
+.login-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.15),
+    0 8px 32px rgba(0,0,0,0.28),
+    0 32px 80px rgba(0,40,50,0.35);
+}
+
+/* Top accent gradient bar */
+.login-card-accent {
+  height: 4px;
+  background: linear-gradient(90deg, #004E57 0%, #006D77 40%, #E8A838 100%);
+}
+
+/* Logo block */
+.login-logo-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 40px 24px;
+  gap: 12px;
+}
+
+.login-logo-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, #004E57 0%, #006D77 60%, #00838F 100%);
+  box-shadow: 0 6px 24px rgba(0,109,119,0.45), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: #0D1B1E;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: #8BA3AB;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* Divider */
+.login-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #E8EDF0 20%, #E8EDF0 80%, transparent);
+  margin: 0 40px;
+}
+
+/* Form */
+.login-form {
+  padding: 28px 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4A6670;
+}
+
+.login-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1.5px solid #E8EDF0;
+  background: #F8FAFB;
+  font-size: 14px;
+  color: #0D1B1E;
+  font-family: var(--font-inter);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.login-input::placeholder { color: #B0C4CA; }
+.login-input:focus {
+  border-color: #006D77;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(0,109,119,0.12);
+}
+
+.login-input-wrap { position: relative; }
+.login-input-pw   { padding-right: 48px; }
+
+.login-pw-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 48px;
+  width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8BA3AB;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 0 12px 12px 0;
+  transition: color 0.15s;
+}
+.login-pw-toggle:hover { color: #006D77; }
+
+/* Error */
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #991b1b;
+  background: rgba(220,38,38,0.07);
+  border: 1px solid rgba(220,38,38,0.2);
+  overflow: hidden;
+}
+.login-error-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+  flex-shrink: 0;
+}
+
+/* Submit button */
+.login-btn {
+  height: 52px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(135deg, #004E57 0%, #006D77 60%, #00838F 100%);
+  box-shadow: 0 4px 16px rgba(0,109,119,0.4), 0 1px 4px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.15s, box-shadow 0.15s;
+  margin-top: 4px;
+}
+.login-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.login-btn:not(:disabled):hover {
+  box-shadow: 0 6px 24px rgba(0,109,119,0.5), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.login-spinner {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Compliance badge */
+.login-compliance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 40px 20px;
+  font-size: 11px;
+  color: #8BA3AB;
+  letter-spacing: 0.02em;
+}
+.login-compliance-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+  flex-shrink: 0;
+}
+
+/* Footer below card */
+.login-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+}
+.login-footer-brand {
+  color: rgba(255,255,255,0.7);
+  font-weight: 600;
+}
+
+/* ── Responsive: small screens ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .login-form        { padding: 24px 24px 28px; }
+  .login-logo-block  { padding: 28px 24px 20px; }
+  .login-divider     { margin: 0 24px; }
+  .login-compliance  { padding: 12px 24px 16px; }
+}
+
+/* ── POS receipt print: only the receipt card, not the whole /pos page ───────
+   Triggered by adding class `print-pos-receipt` on <html> before window.print(). */
+@media print {
+  html.print-pos-receipt {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html.print-pos-receipt body {
+    background: #fff !important;
+  }
+
+  html.print-pos-receipt body * {
+    visibility: hidden;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area,
+  html.print-pos-receipt #pos-receipt-print-area * {
+    visibility: visible;
+  }
+
+  html.print-pos-receipt .no-print,
+  html.print-pos-receipt .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    width: 100%;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #0d1b1e !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .bg-surface-card {
+    background: #fff !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .print-receipt-header,
+  html.print-pos-receipt #pos-receipt-print-area .bg-teal {
+    background: #006d77 !important;
+    color: #fff !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .text-gold {
+    color: #e8a838 !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .text-teal-100 {
+    color: rgba(255, 255, 255, 0.88) !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .text-content-primary {
+    color: #0d1b1e !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .text-content-secondary,
+  html.print-pos-receipt #pos-receipt-print-area .text-content-muted {
+    color: #4a6670 !important;
+  }
+
+  html.print-pos-receipt #pos-receipt-print-area .border-surface-border {
+    border-color: #e8edf0 !important;
+  }
+}

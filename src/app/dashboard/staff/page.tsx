@@ -1,0 +1,1569 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation } from '@apollo/client';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import {
+  UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye,
+  LayoutGrid, List, Search, Filter, X, Wifi, WifiOff, Clock, Building2,
+  TrendingUp, Users, UserCheck, AlertCircle, ChevronDown, Banknote,
+  GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  LIST_STAFF, STAFF_MEMBER, STAFF_SESSION_HISTORY,
+  INVITE_STAFF, DEACTIVATE_STAFF, RESET_STAFF_PASSWORD, UPDATE_STAFF_PROFILE,
+} from '@/lib/graphql/dashboard.queries';
+import { formatApolloError } from '@/lib/apollo/format-apollo-error';
+import { useAuthStore } from '@/lib/store/auth.store';
+import { formatAccraDate, cn } from '@/lib/utils';
+import { Pagination } from '@/components/ui/pagination';
+import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface StaffMember {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+  branch_id: string;
+  is_active: boolean;
+  is_on_duty: boolean;
+  position?: string;
+  department?: string;
+  employment_type?: string;
+  professional_licence_no?: string;
+  licence_expiry_date?: string;
+  start_date?: string;
+  photo_url?: string;
+  certificate_s3_keys?: string[];
+  salary_amount_pesewas?: number;
+  salary_period?: string;
+  bank_name?: string;
+  created_at: string;
+}
+
+interface StaffSessionRow {
+  id: string;
+  userId: string;
+  user_name: string;
+  user_role: string;
+  branchId: string;
+  branch_name: string;
+  sessionId: string;
+  started_at: string;
+  ended_at?: string | null;
+  last_seen_at: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  is_open: boolean;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner', se_admin: 'SE Admin', manager: 'Manager',
+  head_pharmacist: 'Head Pharmacist', pharmacist: 'Pharmacist',
+  technician: 'Technician', cashier: 'Cashier', chemical_cashier: 'Chemical Cashier',
+};
+
+const ROLE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  owner:            { bg: 'rgba(147,51,234,0.1)',  text: '#7e22ce', dot: '#9333ea' },
+  se_admin:         { bg: 'rgba(220,38,38,0.1)',   text: '#b91c1c', dot: '#dc2626' },
+  manager:          { bg: 'rgba(37,99,235,0.1)',   text: '#1d4ed8', dot: '#2563eb' },
+  head_pharmacist:  { bg: 'rgba(0,109,119,0.12)',  text: '#004e57', dot: '#006d77' },
+  pharmacist:       { bg: 'rgba(22,163,74,0.1)',   text: '#15803d', dot: '#16a34a' },
+  technician:       { bg: 'rgba(202,138,4,0.1)',   text: '#854d0e', dot: '#ca8a04' },
+  cashier:          { bg: 'rgba(100,116,139,0.1)', text: '#475569', dot: '#64748b' },
+  chemical_cashier: { bg: 'rgba(234,88,12,0.1)',   text: '#9a3412', dot: '#ea580c' },
+};
+
+const EMPLOYMENT_LABELS: Record<string, string> = {
+  full_time: 'Full-time', part_time: 'Part-time', contract: 'Contract',
+};
+
+const INVITE_ROLES = ['manager','head_pharmacist','pharmacist','technician','cashier','chemical_cashier'];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatGhs(pesewas?: number): string {
+  if (!pesewas) return '—';
+  return `GH₵ ${(pesewas / 100).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`;
+}
+
+function formatAccraDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-GH', {
+    timeZone: 'Africa/Accra', dateStyle: 'medium', timeStyle: 'short',
+  });
+}
+
+function toDateInputValue(value?: string): string {
+  if (!value) return '';
+  return value.slice(0, 10);
+}
+
+function computeProfileCompletion(m: StaffMember): number {
+  const fields = [
+    m.position, m.department, m.employment_type, m.start_date,
+    ...(m.role === 'pharmacist' || m.role === 'head_pharmacist'
+      ? [m.professional_licence_no, m.licence_expiry_date] : []),
+  ];
+  const filled = fields.filter((v) => !!v && String(v).trim().length > 0).length;
+  return fields.length > 0 ? Math.round((filled / fields.length) * 100) : 100;
+}
+
+function getInitials(name: string): string {
+  return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+}
+
+// Deterministic avatar gradient from name
+function avatarGradient(name: string): string {
+  const gradients = [
+    'linear-gradient(135deg,#006d77,#004e57)',
+    'linear-gradient(135deg,#1d4ed8,#1e40af)',
+    'linear-gradient(135deg,#7e22ce,#6b21a8)',
+    'linear-gradient(135deg,#15803d,#166534)',
+    'linear-gradient(135deg,#b45309,#92400e)',
+    'linear-gradient(135deg,#0e7490,#155e75)',
+    'linear-gradient(135deg,#be185d,#9d174d)',
+  ];
+  const idx = name.charCodeAt(0) % gradients.length;
+  return gradients[idx];
+}
+
+// ── Avatar component ──────────────────────────────────────────────────────────
+
+function StaffAvatar({ member, size = 48 }: { member: StaffMember; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  const rc = ROLE_COLORS[member.role];
+
+  if (member.photo_url && !broken) {
+    return (
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <img
+          src={member.photo_url}
+          alt={member.name}
+          className="rounded-full object-cover w-full h-full"
+          style={{ border: `2px solid ${rc?.dot ?? '#006d77'}33` }}
+          onError={() => setBroken(true)}
+        />
+        {member.is_on_duty && (
+          <span
+            className="absolute bottom-0 right-0 rounded-full border-2"
+            style={{ width: 12, height: 12, background: '#16a34a', borderColor: 'var(--surface-card)' }}
+            title="On duty"
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative shrink-0 rounded-full flex items-center justify-center font-bold text-white"
+      style={{ width: size, height: size, background: avatarGradient(member.name), fontSize: size * 0.33 }}>
+      {getInitials(member.name)}
+      {member.is_on_duty && (
+        <span
+          className="absolute bottom-0 right-0 rounded-full border-2"
+          style={{ width: 12, height: 12, background: '#16a34a', borderColor: 'var(--surface-card)' }}
+          title="On duty"
+        />
+      )}
+    </div>
+  );
+}
+
+// ── KPI bar ───────────────────────────────────────────────────────────────────
+
+function StaffKpiBar({ staff }: { staff: StaffMember[] }) {
+  const total = staff.length;
+  const onDuty = staff.filter((s) => s.is_on_duty).length;
+  const active = staff.filter((s) => s.is_active).length;
+  const incomplete = staff.filter((s) => computeProfileCompletion(s) < 100).length;
+
+  const kpis = [
+    { icon: Users, label: 'Total staff', value: total, color: '#006d77' },
+    { icon: Wifi, label: 'On duty now', value: onDuty, color: '#16a34a', pulse: onDuty > 0 },
+    { icon: UserCheck, label: 'Active accounts', value: active, color: '#2563eb' },
+    { icon: AlertCircle, label: 'Profiles incomplete', value: incomplete, color: incomplete > 0 ? '#b45309' : '#64748b' },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
+      {kpis.map((k, i) => (
+        <motion.div
+          key={k.label}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.06 }}
+          className="rounded-xl p-4"
+          style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--shadow-card)' }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{k.label}</span>
+            <div className="rounded-lg p-1.5" style={{ background: `${k.color}18` }}>
+              <k.icon size={14} style={{ color: k.color }} />
+            </div>
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{k.value}</span>
+            {k.pulse && k.value > 0 && (
+              <span className="mb-1 flex items-center gap-1 text-xs font-medium" style={{ color: '#16a34a' }}>
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                live
+              </span>
+            )}
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+// ── Staff card (grid view) ────────────────────────────────────────────────────
+
+function StaffCard({
+  member, canManage, currentUserId, onView, onEdit, onDeactivate, onResetPw,
+}: {
+  member: StaffMember;
+  canManage: boolean;
+  currentUserId?: string;
+  onView: () => void;
+  onEdit: () => void;
+  onDeactivate: () => void;
+  onResetPw: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rc = ROLE_COLORS[member.role] ?? ROLE_COLORS.cashier;
+  const completion = computeProfileCompletion(member);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.94 }}
+      whileHover={{ y: -2, boxShadow: '0 8px 32px rgba(0,109,119,0.12)' }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="relative rounded-2xl p-5 flex flex-col gap-3"
+      style={{
+        background: 'var(--surface-card)',
+        border: member.is_on_duty
+          ? '1.5px solid rgba(22,163,74,0.4)'
+          : '1px solid var(--surface-border)',
+        boxShadow: 'var(--shadow-card)',
+      }}
+    >
+      {/* On-duty banner */}
+      {member.is_on_duty && (
+        <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
+          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+          On duty
+        </div>
+      )}
+
+      {/* Menu */}
+      {canManage && (
+        <div className="absolute top-3 right-3">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Actions"
+          >
+            <MoreVertical size={15} />
+          </button>
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                className="absolute right-0 top-8 z-20 w-44 rounded-xl py-1"
+                style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--shadow-modal)' }}
+              >
+                {[
+                  { icon: Eye, label: 'View details', action: onView },
+                  { icon: PencilLine, label: 'Edit profile', action: onEdit },
+                  { icon: KeyRound, label: 'Reset password', action: onResetPw },
+                ].map(({ icon: Icon, label, action }) => (
+                  <button key={label} onClick={() => { setMenuOpen(false); action(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-[var(--surface-hover)]"
+                    style={{ color: 'var(--text-secondary)' }}>
+                    <Icon size={13} /> {label}
+                  </button>
+                ))}
+                {member.is_active && member.id !== currentUserId && (
+                  <button onClick={() => { setMenuOpen(false); onDeactivate(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-red-50"
+                    style={{ color: '#dc2626' }}>
+                    <ShieldOff size={13} /> Deactivate
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Avatar + name */}
+      <div className="flex flex-col items-center gap-2 pt-4">
+        <StaffAvatar member={member} size={64} />
+        <div className="text-center">
+          <p className="font-semibold text-sm leading-tight" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
+          {member.position && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{member.position}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Role badge */}
+      <div className="flex justify-center">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+          style={{ background: rc.bg, color: rc.text }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: rc.dot }} />
+          {ROLE_LABELS[member.role] ?? member.role}
+        </span>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-2 text-center">
+        <div className="rounded-lg p-2" style={{ background: 'var(--surface-base)' }}>
+          <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Employment</p>
+          <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            {member.employment_type ? (EMPLOYMENT_LABELS[member.employment_type] ?? member.employment_type) : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg p-2" style={{ background: 'var(--surface-base)' }}>
+          <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Profile</p>
+          <p className="text-xs font-semibold mt-0.5"
+            style={{ color: completion === 100 ? '#15803d' : '#b45309' }}>
+            {completion === 100 ? 'Complete' : `${completion}%`}
+          </p>
+        </div>
+      </div>
+
+      {/* Profile completion bar */}
+      {completion < 100 && (
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--surface-border)' }}>
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${completion}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            style={{ background: completion > 60 ? '#ca8a04' : '#dc2626' }}
+          />
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1" style={{ color: member.is_active ? '#15803d' : 'var(--text-muted)' }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: member.is_active ? '#16a34a' : '#94a3b8' }} />
+          {member.is_active ? 'Active' : 'Inactive'}
+        </span>
+        {member.salary_amount_pesewas && (
+          <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            {formatGhs(member.salary_amount_pesewas)}/{member.salary_period?.replace('ly','') ?? 'mo'}
+          </span>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="rounded-2xl p-5 space-y-3"
+          style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <div className="skeleton h-16 w-16 rounded-full" />
+            <div className="skeleton h-3 w-24 rounded" />
+            <div className="skeleton h-2.5 w-16 rounded" />
+          </div>
+          <div className="skeleton h-5 w-20 rounded-full mx-auto" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="skeleton h-10 rounded-lg" />
+            <div className="skeleton h-10 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-4 py-3"
+          style={{ borderBottom: '1px solid var(--surface-border)' }}>
+          <div className="skeleton h-10 w-10 rounded-full shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton h-3 w-32 rounded" />
+            <div className="skeleton h-2.5 w-24 rounded" />
+          </div>
+          <div className="skeleton h-5 w-20 rounded-full" />
+          <div className="skeleton h-5 w-16 rounded-full hidden md:block" />
+          <div className="skeleton h-5 w-14 rounded-full hidden lg:block" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+
+function FilterBar({
+  search, setSearch, roleFilter, setRoleFilter,
+  statusFilter, setStatusFilter, dutyFilter, setDutyFilter,
+}: {
+  search: string; setSearch: (v: string) => void;
+  roleFilter: string; setRoleFilter: (v: string) => void;
+  statusFilter: string; setStatusFilter: (v: string) => void;
+  dutyFilter: string; setDutyFilter: (v: string) => void;
+}) {
+  const hasFilters = roleFilter !== 'all' || statusFilter !== 'all' || dutyFilter !== 'all';
+
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: 'var(--text-muted)' }} />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, role, position…"
+          className="w-full rounded-xl py-2.5 pl-9 pr-4 text-sm outline-none"
+          style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-primary)' }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+        className="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-secondary)' }}>
+        <option value="all">All roles</option>
+        {Object.entries(ROLE_LABELS).filter(([k]) => k !== 'se_admin').map(([k, v]) => (
+          <option key={k} value={k}>{v}</option>
+        ))}
+      </select>
+
+      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+        className="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-secondary)' }}>
+        <option value="all">All status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+
+      <select value={dutyFilter} onChange={(e) => setDutyFilter(e.target.value)}
+        className="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-secondary)' }}>
+        <option value="all">All duty</option>
+        <option value="on">On duty</option>
+        <option value="off">Off duty</option>
+      </select>
+
+      {hasFilters && (
+        <button onClick={() => { setRoleFilter('all'); setStatusFilter('all'); setDutyFilter('all'); }}
+          className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium"
+          style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
+          <X size={13} /> Clear filters
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function StaffPage() {
+  const { user } = useAuthStore();
+  const shouldReduceMotion = useReducedMotion();
+  const [tab, setTab] = useState<'roster' | 'activity'>('roster');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dutyFilter, setDutyFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  const itemsPerPage = viewMode === 'grid' ? 12 : 10;
+
+  const [showInvite, setShowInvite] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<StaffMember | null>(null);
+  const [showCompletionBanner, setShowCompletionBanner] = useState(true);
+
+  const { data, loading, refetch } = useQuery<{ listStaff: StaffMember[] }>(LIST_STAFF, {
+    skip: !user,
+    pollInterval: 30_000, // refresh on-duty status every 30s
+  });
+
+  const { data: sessionData, loading: sessionLoading, error: sessionError } =
+    useQuery<{ staffSessionHistory: StaffSessionRow[] }>(STAFF_SESSION_HISTORY, {
+      skip: !user || tab !== 'activity',
+      variables: { limit: itemsPerPage, offset: (activityPage - 1) * itemsPerPage },
+      fetchPolicy: 'network-only',
+    });
+
+  const { data: detailData, loading: detailLoading, error: detailError } =
+    useQuery<{ staffMember: StaffMember }>(STAFF_MEMBER, {
+      skip: !showDetails || !detailTarget,
+      variables: detailTarget ? { userId: detailTarget.id } : undefined,
+      fetchPolicy: 'network-only',
+    });
+
+  const [deactivate] = useMutation(DEACTIVATE_STAFF, { onCompleted: () => refetch() });
+  const [resetPassword] = useMutation(RESET_STAFF_PASSWORD);
+  const [updateStaffProfile] = useMutation(UPDATE_STAFF_PROFILE, { onCompleted: () => refetch() });
+
+  const canManage = user && ['owner', 'se_admin', 'manager'].includes(user.role);
+  const showBranchColumn = user && ['owner', 'se_admin'].includes(user.role);
+
+  const allStaff = data?.listStaff ?? [];
+
+  const filtered = useMemo(() => {
+    return allStaff.filter((s) => {
+      const q = search.toLowerCase();
+      const matchSearch = !q || s.name.toLowerCase().includes(q) ||
+        s.role.toLowerCase().includes(q) ||
+        (s.position ?? '').toLowerCase().includes(q) ||
+        (s.department ?? '').toLowerCase().includes(q) ||
+        (s.email ?? '').toLowerCase().includes(q);
+      const matchRole = roleFilter === 'all' || s.role === roleFilter;
+      const matchStatus = statusFilter === 'all' ||
+        (statusFilter === 'active' ? s.is_active : !s.is_active);
+      const matchDuty = dutyFilter === 'all' ||
+        (dutyFilter === 'on' ? s.is_on_duty : !s.is_on_duty);
+      return matchSearch && matchRole && matchStatus && matchDuty;
+    });
+  }, [allStaff, search, roleFilter, statusFilter, dutyFilter]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const incompleteCount = allStaff.filter((s) => computeProfileCompletion(s) < 100).length;
+  const sessions = sessionData?.staffSessionHistory ?? [];
+  const sessionHasNext = sessions.length === itemsPerPage;
+
+  useEffect(() => { setCurrentPage(1); }, [search, roleFilter, statusFilter, dutyFilter]);
+  useEffect(() => { setActivityPage(1); }, [tab]);
+
+  function handleResetPw(member: StaffMember) {
+    const value = window.prompt(`New password for ${member.name} (min 8 chars):`);
+    const pw = value?.trim();
+    if (!pw || pw.length < 8) return;
+    void resetPassword({ variables: { input: { userId: member.id, newPassword: pw } } })
+      .then(() => window.alert(`Password reset for ${member.name}.`))
+      .catch((err: unknown) => window.alert(err instanceof Error ? err.message : 'Reset failed.'));
+  }
+
+  function handleDeactivate(member: StaffMember) {
+    if (!window.confirm(`Deactivate ${member.name}? They will be logged out immediately.`)) return;
+    void deactivate({ variables: { userId: member.id } });
+  }
+
+  return (
+    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Staff Management</h1>
+          <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {allStaff.length} member{allStaff.length !== 1 ? 's' : ''} ·{' '}
+            <span style={{ color: '#16a34a' }}>{allStaff.filter((s) => s.is_on_duty).length} on duty</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Tab switcher */}
+          <div className="inline-flex rounded-xl p-0.5"
+            style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+            {(['roster', 'activity'] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setTab(t)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors capitalize"
+                style={{
+                  background: tab === t ? 'var(--surface-card)' : 'transparent',
+                  color: tab === t ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: tab === t ? 'var(--shadow-card)' : 'none',
+                }}>
+                {t === 'activity' ? <span className="flex items-center gap-1.5"><LogIn size={13} />Sign-in activity</span> : 'Team roster'}
+              </button>
+            ))}
+          </div>
+
+          {/* View toggle (roster only) */}
+          {tab === 'roster' && (
+            <div className="inline-flex rounded-xl p-0.5"
+              style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+              {([['grid', LayoutGrid], ['list', List]] as const).map(([mode, Icon]) => (
+                <button key={mode} type="button" onClick={() => setViewMode(mode)}
+                  className="rounded-lg p-2 transition-colors"
+                  style={{
+                    background: viewMode === mode ? 'var(--surface-card)' : 'transparent',
+                    color: viewMode === mode ? 'var(--color-teal)' : 'var(--text-muted)',
+                  }}>
+                  <Icon size={15} />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {canManage && tab === 'roster' && (
+            <button onClick={() => setShowInvite(true)}
+              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all"
+              style={{ background: 'linear-gradient(135deg,var(--color-teal-dark),var(--color-teal))', minHeight: 44, boxShadow: '0 2px 12px rgba(0,109,119,0.35)' }}>
+              <UserPlus size={15} /> Invite staff
+            </button>
+          )}
+        </div>
+      </div>
+
+      {tab === 'roster' && (
+        <>
+          <StaffKpiBar staff={allStaff} />
+
+          {/* Incomplete banner */}
+          <AnimatePresence>
+            {canManage && showCompletionBanner && incompleteCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-5 flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+                style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.22)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={15} style={{ color: '#b45309' }} />
+                  <p className="text-sm font-medium" style={{ color: '#92400e' }}>
+                    {incompleteCount} staff profile{incompleteCount > 1 ? 's' : ''} need completion
+                  </p>
+                </div>
+                <button onClick={() => setShowCompletionBanner(false)}
+                  className="rounded-lg px-3 py-1 text-xs font-medium"
+                  style={{ border: '1px solid rgba(217,119,6,0.35)', color: '#9a3412' }}>
+                  Dismiss
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <FilterBar
+            search={search} setSearch={setSearch}
+            roleFilter={roleFilter} setRoleFilter={setRoleFilter}
+            statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+            dutyFilter={dutyFilter} setDutyFilter={setDutyFilter}
+          />
+
+          {/* Grid view */}
+          {viewMode === 'grid' && (
+            loading ? <GridSkeleton /> : (
+              <>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  <AnimatePresence mode="popLayout">
+                    {paginated.map((member) => (
+                      <StaffCard
+                        key={member.id}
+                        member={member}
+                        canManage={!!canManage}
+                        currentUserId={user?.id}
+                        onView={() => { setDetailTarget(member); setShowDetails(true); }}
+                        onEdit={() => { setEditingMember(member); setShowEdit(true); }}
+                        onDeactivate={() => handleDeactivate(member)}
+                        onResetPw={() => handleResetPw(member)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+                {filtered.length === 0 && (
+                  <div className="py-16 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                    No staff members match your filters.
+                  </div>
+                )}
+              </>
+            )
+          )}
+
+          {/* List view */}
+          {viewMode === 'list' && (
+            <div className="rounded-2xl overflow-hidden"
+              style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
+              {loading ? <TableSkeleton /> : (
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide"
+                      style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)', color: 'var(--text-muted)' }}>
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3 hidden md:table-cell">Position</th>
+                      <th className="px-4 py-3 hidden lg:table-cell">Salary</th>
+                      <th className="px-4 py-3 hidden lg:table-cell">Profile</th>
+                      <th className="px-4 py-3">Status</th>
+                      {canManage && <th className="px-4 py-3 w-10" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <AnimatePresence initial={false}>
+                      {paginated.map((member, i) => {
+                        const rc = ROLE_COLORS[member.role] ?? ROLE_COLORS.cashier;
+                        const completion = computeProfileCompletion(member);
+                        return (
+                          <motion.tr key={member.id}
+                            initial={shouldReduceMotion ? false : { opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ delay: i * 0.04 }}
+                            style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <StaffAvatar member={member} size={40} />
+                                <div>
+                                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
+                                  {member.email && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{member.email}</p>}
+                                  {completion < 100 && (
+                                    <p className="text-[11px] font-semibold" style={{ color: '#b45309' }}>Profile incomplete</p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                style={{ background: rc.bg, color: rc.text }}>
+                                <span className="h-1.5 w-1.5 rounded-full" style={{ background: rc.dot }} />
+                                {ROLE_LABELS[member.role] ?? member.role}
+                              </span>
+                            </td>
+                            <td className="hidden px-4 py-3 text-xs md:table-cell" style={{ color: 'var(--text-secondary)' }}>
+                              {member.position ?? '—'}
+                            </td>
+                            <td className="hidden px-4 py-3 text-xs lg:table-cell font-mono" style={{ color: 'var(--text-secondary)' }}>
+                              {member.salary_amount_pesewas
+                                ? `${formatGhs(member.salary_amount_pesewas)}/${member.salary_period?.replace('ly','') ?? 'mo'}`
+                                : '—'}
+                            </td>
+                            <td className="hidden px-4 py-3 lg:table-cell">
+                              <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                                style={completion === 100
+                                  ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
+                                  : { background: 'rgba(217,119,6,0.12)', color: '#92400e' }}>
+                                {completion === 100 ? 'Complete' : `${completion}%`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                                style={member.is_active
+                                  ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
+                                  : { background: 'var(--surface-border)', color: 'var(--text-muted)' }}>
+                                <span className="h-1.5 w-1.5 rounded-full"
+                                  style={{ background: member.is_active ? '#16a34a' : '#94a3b8' }} />
+                                {member.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            {canManage && (
+                              <td className="relative px-4 py-3">
+                                <ListRowMenu
+                                  member={member}
+                                  isLast={i >= paginated.length - 2 && paginated.length > 2}
+                                  currentUserId={user?.id}
+                                  onView={() => { setDetailTarget(member); setShowDetails(true); }}
+                                  onEdit={() => { setEditingMember(member); setShowEdit(true); }}
+                                  onDeactivate={() => handleDeactivate(member)}
+                                  onResetPw={() => handleResetPw(member)}
+                                />
+                              </td>
+                            )}
+                          </motion.tr>
+                        );
+                      })}
+                    </AnimatePresence>
+                    {!loading && paginated.length === 0 && (
+                      <tr>
+                        <td colSpan={canManage ? 7 : 6} className="px-4 py-12 text-center text-sm"
+                          style={{ color: 'var(--text-muted)' }}>
+                          No staff members match your filters.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+              {!loading && filtered.length > 0 && (
+                <Pagination currentPage={currentPage} totalPages={totalPages}
+                  onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+              )}
+            </div>
+          )}
+
+          {/* Grid pagination */}
+          {viewMode === 'grid' && !loading && filtered.length > itemsPerPage && (
+            <div className="mt-4">
+              <Pagination currentPage={currentPage} totalPages={totalPages}
+                onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Activity tab */}
+      {tab === 'activity' && (
+        <ActivityTab
+          sessions={sessions}
+          loading={sessionLoading}
+          error={sessionError ? formatApolloError(sessionError) : null}
+          showBranchColumn={!!showBranchColumn}
+          page={activityPage}
+          hasNext={sessionHasNext}
+          onPrev={() => setActivityPage((p) => Math.max(1, p - 1))}
+          onNext={() => setActivityPage((p) => p + 1)}
+        />
+      )}
+
+      {/* Modals */}
+      <AnimatePresence>
+        {showInvite && (
+          <InviteModal
+            onClose={() => setShowInvite(false)}
+            onSuccess={() => { setShowInvite(false); void refetch(); }}
+            onCompleteProfile={(invited) => {
+              setShowInvite(false);
+              const existing = allStaff.find((s) => s.id === invited.userId);
+              setEditingMember(existing ?? {
+                id: invited.userId, name: invited.name, email: invited.email ?? undefined,
+                role: invited.role, branch_id: user?.branch_id ?? '', is_active: true,
+                is_on_duty: false, created_at: new Date().toISOString(),
+              });
+              setShowEdit(true);
+              void refetch();
+            }}
+          />
+        )}
+        {showEdit && editingMember && (
+          <EditStaffModal
+            member={editingMember}
+            onClose={() => { setShowEdit(false); setEditingMember(null); }}
+            onSave={async (input) => {
+              await updateStaffProfile({ variables: { input } });
+              setShowEdit(false);
+              setEditingMember(null);
+            }}
+          />
+        )}
+        {showDetails && detailTarget && (
+          <StaffDetailsModal
+            member={detailData?.staffMember ?? detailTarget}
+            loading={detailLoading}
+            errorMessage={formatApolloError(detailError)}
+            onEdit={() => {
+              setShowDetails(false);
+              setDetailTarget(null);
+              setEditingMember(detailData?.staffMember ?? detailTarget);
+              setShowEdit(true);
+            }}
+            onClose={() => { setShowDetails(false); setDetailTarget(null); }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── List row menu ─────────────────────────────────────────────────────────────
+
+function ListRowMenu({ member, isLast, currentUserId, onView, onEdit, onDeactivate, onResetPw }: {
+  member: StaffMember; isLast: boolean; currentUserId?: string;
+  onView: () => void; onEdit: () => void; onDeactivate: () => void; onResetPw: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(!open)} className="rounded p-1 transition-colors"
+        style={{ color: 'var(--text-muted)' }} aria-label="Actions">
+        <MoreVertical size={15} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className={cn('absolute right-4 z-10 w-44 rounded-xl py-1', isLast ? 'bottom-8 mb-2' : 'top-10')}
+            style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-modal)' }}>
+            {[
+              { icon: Eye, label: 'View details', action: onView },
+              { icon: PencilLine, label: 'Edit profile', action: onEdit },
+              { icon: KeyRound, label: 'Reset password', action: onResetPw },
+            ].map(({ icon: Icon, label, action }) => (
+              <button key={label} onClick={() => { setOpen(false); action(); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-[var(--surface-hover)]"
+                style={{ color: 'var(--text-secondary)' }}>
+                <Icon size={13} /> {label}
+              </button>
+            ))}
+            {member.is_active && member.id !== currentUserId && (
+              <button onClick={() => { setOpen(false); onDeactivate(); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-red-50"
+                style={{ color: '#dc2626' }}>
+                <ShieldOff size={13} /> Deactivate
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ── Activity tab ──────────────────────────────────────────────────────────────
+
+function ActivityTab({ sessions, loading, error, showBranchColumn, page, hasNext, onPrev, onNext }: {
+  sessions: StaffSessionRow[]; loading: boolean; error: string | null;
+  showBranchColumn: boolean; page: number; hasNext: boolean;
+  onPrev: () => void; onNext: () => void;
+}) {
+  return (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
+      <div className="flex items-center gap-2 border-b px-4 py-3"
+        style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-base)' }}>
+        <Wifi size={14} style={{ color: '#16a34a' }} />
+        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+          Live sign-in activity · last 14 Accra calendar days · auto-refreshes
+        </p>
+      </div>
+      {error && <p className="px-4 py-3 text-sm" style={{ color: '#dc2626' }}>{error}</p>}
+      {loading ? <TableSkeleton /> : (
+        <table className="w-full text-sm min-w-[720px]">
+          <thead>
+            <tr className="text-left text-xs font-medium uppercase tracking-wide"
+              style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)', color: 'var(--text-muted)' }}>
+              <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">Role</th>
+              {showBranchColumn && <th className="px-4 py-3 hidden md:table-cell">Branch</th>}
+              <th className="px-4 py-3">Signed in</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Last active</th>
+              <th className="px-4 py-3">Ended</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((row) => (
+              <tr key={row.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--text-primary)' }}>{row.user_name}</td>
+                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {ROLE_LABELS[row.user_role] ?? row.user_role}
+                </td>
+                {showBranchColumn && (
+                  <td className="hidden px-4 py-3 text-xs md:table-cell" style={{ color: 'var(--text-muted)' }}>
+                    {row.branch_name}
+                  </td>
+                )}
+                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {formatAccraDateTime(row.started_at)}
+                </td>
+                <td className="hidden px-4 py-3 text-xs lg:table-cell" style={{ color: 'var(--text-muted)' }}>
+                  {formatAccraDateTime(row.last_seen_at)}
+                </td>
+                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {row.ended_at ? formatAccraDateTime(row.ended_at) : '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={row.is_open
+                      ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
+                      : { background: 'var(--surface-border)', color: 'var(--text-muted)' }}>
+                    {row.is_open && <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
+                    {row.is_open ? 'Active' : 'Ended'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {!loading && sessions.length === 0 && !error && (
+              <tr>
+                <td colSpan={showBranchColumn ? 7 : 6} className="px-4 py-12 text-center text-sm"
+                  style={{ color: 'var(--text-muted)' }}>
+                  No sign-in activity in this range yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+      {(sessions.length > 0 || page > 1) && (
+        <div className="flex items-center justify-between gap-3 border-t px-4 py-3"
+          style={{ borderColor: 'var(--surface-border)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Page {page}{hasNext ? ' · more available' : ''}
+          </span>
+          <div className="flex gap-2">
+            <button type="button" disabled={page <= 1} onClick={onPrev}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+              style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+              Previous
+            </button>
+            <button type="button" disabled={!hasNext} onClick={onNext}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+              style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Staff details modal ───────────────────────────────────────────────────────
+
+function StaffDetailsModal({ member, loading, errorMessage, onEdit, onClose }: {
+  member: StaffMember; loading: boolean; errorMessage: string | null;
+  onEdit: () => void; onClose: () => void;
+}) {
+  const rc = ROLE_COLORS[member.role] ?? ROLE_COLORS.cashier;
+  const completion = computeProfileCompletion(member);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="w-full max-w-lg rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', boxShadow: 'var(--shadow-modal)' }}>
+
+        {/* Header with avatar */}
+        <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+          <div className="flex items-start gap-4">
+            <StaffAvatar member={member} size={64} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{member.name}</h2>
+                {member.is_on_duty && (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                    style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    On duty
+                  </span>
+                )}
+              </div>
+              <span className="inline-flex items-center gap-1 mt-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                style={{ background: rc.bg, color: rc.text }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: rc.dot }} />
+                {ROLE_LABELS[member.role] ?? member.role}
+              </span>
+              {member.position && (
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{member.position}</p>
+              )}
+            </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 transition-colors hover:bg-[var(--surface-hover)]"
+              style={{ color: 'var(--text-muted)' }}>
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Profile completion bar */}
+          {completion < 100 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs" style={{ color: '#b45309' }}>Profile {completion}% complete</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-border)' }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${completion}%`, background: '#ca8a04' }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="px-6 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+        ) : errorMessage ? (
+          <div className="px-6 py-4 text-sm" style={{ color: '#dc2626' }}>{errorMessage}</div>
+        ) : (
+          <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Employment */}
+            <Section title="Employment" icon={Briefcase}>
+              <DetailRow icon={Building2} label="Department" value={member.department} />
+              <DetailRow icon={Briefcase} label="Type" value={member.employment_type ? EMPLOYMENT_LABELS[member.employment_type] : undefined} />
+              <DetailRow icon={Calendar} label="Start date" value={member.start_date ? formatAccraDate(member.start_date) : undefined} />
+              <DetailRow icon={Users} label="Branch ID" value={member.branch_id} mono />
+            </Section>
+
+            {/* Compensation */}
+            <Section title="Compensation (GHS)" icon={Banknote}>
+              <DetailRow icon={Banknote} label="Salary"
+                value={member.salary_amount_pesewas
+                  ? `${formatGhs(member.salary_amount_pesewas)} / ${member.salary_period ?? 'monthly'}`
+                  : undefined} />
+              <DetailRow icon={Building2} label="Bank" value={member.bank_name} />
+            </Section>
+
+            {/* Compliance */}
+            {(member.role === 'pharmacist' || member.role === 'head_pharmacist' || member.professional_licence_no) && (
+              <Section title="Ghana FDA Compliance" icon={BadgeCheck}>
+                <DetailRow icon={BadgeCheck} label="Licence no." value={member.professional_licence_no} mono />
+                <DetailRow icon={Calendar} label="Licence expiry"
+                  value={member.licence_expiry_date ? formatAccraDate(member.licence_expiry_date) : undefined} />
+                <DetailRow icon={GraduationCap} label="Certificates"
+                  value={(member.certificate_s3_keys?.length ?? 0) > 0
+                    ? `${member.certificate_s3_keys?.length} file(s) on S3` : undefined} />
+              </Section>
+            )}
+
+            {/* Contact */}
+            <Section title="Account" icon={Phone}>
+              <DetailRow icon={Phone} label="Email" value={member.email} />
+              <DetailRow icon={Calendar} label="Joined" value={formatAccraDate(member.created_at)} />
+              <DetailRow icon={BadgeCheck} label="Account status"
+                value={member.is_active ? 'Active' : 'Deactivated'}
+                valueColor={member.is_active ? '#15803d' : '#dc2626'} />
+            </Section>
+          </div>
+        )}
+
+        <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
+          <button type="button" onClick={onClose}
+            className="flex-1 rounded-xl py-2.5 text-sm font-medium"
+            style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+            Close
+          </button>
+          <button type="button" onClick={onEdit}
+            className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white"
+            style={{ background: 'var(--color-teal)' }}>
+            Edit profile
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Section({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon size={13} style={{ color: 'var(--color-teal)' }} />
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{title}</p>
+      </div>
+      <div
+        className="rounded-xl divide-y divide-[var(--surface-border)]"
+        style={{ border: '1px solid var(--surface-border)' }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ icon: Icon, label, value, mono, valueColor }: {
+  icon: LucideIcon; label: string; value?: string | null;
+  mono?: boolean; valueColor?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2 gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <Icon size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      </div>
+      <span className={cn('text-xs font-medium truncate', mono && 'font-mono')}
+        style={{ color: valueColor ?? (value ? 'var(--text-primary)' : 'var(--text-muted)') }}>
+        {value ?? '—'}
+      </span>
+    </div>
+  );
+}
+
+// ── Invite modal ──────────────────────────────────────────────────────────────
+
+function InviteModal({ onClose, onSuccess, onCompleteProfile }: {
+  onClose: () => void;
+  onSuccess: () => void;
+  onCompleteProfile: (r: { userId: string; name: string; email?: string | null; role: string }) => void;
+}) {
+  const [form, setForm] = useState({ name: '', email: '', role: 'cashier', position: '', department: '' });
+  const [result, setResult] = useState<{
+    userId: string; name: string; email?: string | null; role: string;
+    temporaryPassword: string; emailSent: boolean; message: string;
+  } | null>(null);
+
+  const [invite, { loading, error }] = useMutation(INVITE_STAFF, {
+    onCompleted: (d: { inviteStaff: typeof result }) => setResult(d.inviteStaff),
+  });
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="w-full max-w-md rounded-2xl p-6"
+        style={{ background: 'var(--surface-card)', boxShadow: 'var(--shadow-modal)' }}>
+
+        {result ? (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full"
+                style={{ background: 'rgba(22,163,74,0.1)' }}>
+                <UserCheck size={18} style={{ color: '#16a34a' }} />
+              </div>
+              <div>
+                <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Staff invited</h2>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{result.message}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl p-3 mb-3 space-y-1.5 text-xs"
+              style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+              <p><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Name:</span>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>{result.name}</span></p>
+              <p><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Role:</span>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>{ROLE_LABELS[result.role] ?? result.role}</span></p>
+              {result.email && <p><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Email:</span>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>{result.email}</span></p>}
+            </div>
+
+            <div className="rounded-xl p-3 mb-4"
+              style={{ background: 'rgba(232,168,56,0.1)', border: '1px solid rgba(232,168,56,0.3)' }}>
+              <p className="text-xs font-medium mb-1" style={{ color: '#92400e' }}>Temporary password — share securely</p>
+              <p className="font-mono text-base font-bold" style={{ color: '#78350f' }}>{result.temporaryPassword}</p>
+              <p className="text-[10px] mt-1" style={{ color: '#b45309' }}>Staff must change this on first login.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={onSuccess}
+                className="flex-1 rounded-xl py-2.5 text-sm font-medium"
+                style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                Done
+              </button>
+              <button onClick={() => onCompleteProfile(result)}
+                className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white"
+                style={{ background: 'var(--color-teal)' }}>
+                Complete profile →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Invite staff member</h2>
+              <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]"
+                style={{ color: 'var(--text-muted)' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); void invite({ variables: { input: form } }); }}
+              className="space-y-3">
+              <Field label="Full name" required>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="input" placeholder="Ama Mensah" />
+              </Field>
+              <Field label="Work email">
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="input" placeholder="ama@azzaypharmacy.com" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Role" required>
+                  <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input">
+                    {INVITE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>)}
+                  </select>
+                </Field>
+                <Field label="Position">
+                  <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })}
+                    className="input" placeholder="e.g. Pharmacist" />
+                </Field>
+              </div>
+              <Field label="Department">
+                <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}
+                  className="input" placeholder="e.g. Dispensary" />
+              </Field>
+              {error && <p className="text-xs" style={{ color: '#dc2626' }}>{formatApolloError(error)}</p>}
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={onClose}
+                  className="flex-1 rounded-xl py-2.5 text-sm font-medium"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={loading}
+                  className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ background: 'var(--color-teal)' }}>
+                  {loading ? 'Inviting…' : 'Send invite'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+        {label}{required && <span className="ml-0.5" style={{ color: '#dc2626' }}>*</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+// ── Edit staff modal (full onboarding form) ───────────────────────────────────
+
+function EditStaffModal({ member, onClose, onSave }: {
+  member: StaffMember;
+  onClose: () => void;
+  onSave: (input: Record<string, unknown>) => Promise<void>;
+}) {
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [previewBroken, setPreviewBroken] = useState(false);
+  const [form, setForm] = useState({
+    position: member.position ?? '',
+    department: member.department ?? '',
+    employment_type: member.employment_type ?? '',
+    professional_licence_no: member.professional_licence_no ?? '',
+    licence_expiry_date: toDateInputValue(member.licence_expiry_date),
+    start_date: toDateInputValue(member.start_date),
+    photo_url: member.photo_url ?? '',
+    salary_amount_pesewas: member.salary_amount_pesewas ? String(member.salary_amount_pesewas / 100) : '',
+    salary_period: member.salary_period ?? 'monthly',
+    bank_name: member.bank_name ?? '',
+  });
+
+  const steps = ['Employment', 'Compensation', 'Compliance', 'Photo'];
+  const isPharmacist = member.role === 'pharmacist' || member.role === 'head_pharmacist';
+
+  const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const salaryPesewas = form.salary_amount_pesewas
+        ? Math.round(parseFloat(form.salary_amount_pesewas) * 100) : undefined;
+      await onSave({
+        userId: member.id,
+        position: form.position.trim() || undefined,
+        department: form.department.trim() || undefined,
+        employment_type: form.employment_type || undefined,
+        professional_licence_no: form.professional_licence_no.trim() || undefined,
+        licence_expiry_date: form.licence_expiry_date || undefined,
+        start_date: form.start_date || undefined,
+        photo_url: form.photo_url.trim() || undefined,
+        salary_amount_pesewas: salaryPesewas,
+        salary_period: form.salary_period || undefined,
+        bank_name: form.bank_name.trim() || undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="w-full max-w-lg rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', boxShadow: 'var(--shadow-modal)' }}>
+
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Edit staff profile</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {member.name} · {ROLE_LABELS[member.role] ?? member.role}
+              </p>
+            </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]"
+              style={{ color: 'var(--text-muted)' }}>
+              <X size={16} />
+            </button>
+          </div>
+          {/* Step tabs */}
+          <div className="flex gap-1">
+            {steps.map((s, i) => (
+              <button key={s} type="button" onClick={() => setStep(i)}
+                className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors"
+                style={{
+                  background: step === i ? 'var(--color-teal)' : 'var(--surface-base)',
+                  color: step === i ? '#fff' : 'var(--text-muted)',
+                  border: step === i ? 'none' : '1px solid var(--surface-border)',
+                }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Step content */}
+        <div className="px-6 py-5 space-y-3 max-h-[55vh] overflow-y-auto">
+          {step === 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Position">
+                  <input value={form.position} onChange={f('position')} className="input" placeholder="e.g. Senior Pharmacist" />
+                </Field>
+                <Field label="Department">
+                  <input value={form.department} onChange={f('department')} className="input" placeholder="e.g. Dispensary" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Employment type">
+                  <select value={form.employment_type} onChange={f('employment_type')} className="input">
+                    <option value="">Select…</option>
+                    <option value="full_time">Full-time</option>
+                    <option value="part_time">Part-time</option>
+                    <option value="contract">Contract</option>
+                  </select>
+                </Field>
+                <Field label="Start date">
+                  <input type="date" value={form.start_date} onChange={f('start_date')} className="input" />
+                </Field>
+              </div>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <div className="rounded-xl p-3 mb-1 text-xs"
+                style={{ background: 'rgba(0,109,119,0.06)', border: '1px solid rgba(0,109,119,0.15)', color: 'var(--text-secondary)' }}>
+                All amounts in Ghana Cedis (GH₵). Never USD.
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Salary (GH₵)">
+                  <input type="number" min="0" step="0.01" value={form.salary_amount_pesewas}
+                    onChange={f('salary_amount_pesewas')} className="input" placeholder="e.g. 2500.00" />
+                </Field>
+                <Field label="Period">
+                  <select value={form.salary_period} onChange={f('salary_period')} className="input">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="annual">Annual</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Bank name">
+                <input value={form.bank_name} onChange={f('bank_name')} className="input"
+                  placeholder="e.g. GCB Bank, Ecobank" />
+              </Field>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              {isPharmacist ? (
+                <>
+                  <div className="rounded-xl p-3 text-xs"
+                    style={{ background: 'rgba(0,109,119,0.06)', border: '1px solid rgba(0,109,119,0.15)', color: 'var(--text-secondary)' }}>
+                    Ghana FDA requires a valid GMDC licence for all pharmacist roles.
+                  </div>
+                  <Field label="GMDC Licence number">
+                    <input value={form.professional_licence_no} onChange={f('professional_licence_no')}
+                      className="input" placeholder="e.g. GMDC-2024-XXXXX" />
+                  </Field>
+                  <Field label="Licence expiry date">
+                    <input type="date" value={form.licence_expiry_date} onChange={f('licence_expiry_date')} className="input" />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Professional licence no. (optional)">
+                    <input value={form.professional_licence_no} onChange={f('professional_licence_no')}
+                      className="input" placeholder="Optional" />
+                  </Field>
+                  <Field label="Licence expiry date">
+                    <input type="date" value={form.licence_expiry_date} onChange={f('licence_expiry_date')} className="input" />
+                  </Field>
+                </>
+              )}
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <Field label="Profile photo URL">
+                <input type="url" value={form.photo_url} onChange={(e) => {
+                  setPreviewBroken(false);
+                  setForm((prev) => ({ ...prev, photo_url: e.target.value }));
+                }} className="input" placeholder="https://…" />
+              </Field>
+              {form.photo_url.trim() && (
+                <div className="flex items-center gap-4 rounded-xl p-3"
+                  style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+                  {!previewBroken ? (
+                    <img src={form.photo_url.trim()} alt="Preview"
+                      className="h-16 w-16 rounded-full object-cover shrink-0"
+                      style={{ border: '2px solid var(--surface-border)' }}
+                      onError={() => setPreviewBroken(true)} />
+                  ) : (
+                    <div className="h-16 w-16 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: 'var(--surface-border)' }}>
+                      <X size={20} style={{ color: 'var(--text-muted)' }} />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: previewBroken ? '#dc2626' : '#15803d' }}>
+                      {previewBroken ? 'Could not load image — check URL' : 'Preview looks good'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4"
+          style={{ borderTop: '1px solid var(--surface-border)' }}>
+          <div className="flex gap-2">
+            <button type="button" disabled={step === 0} onClick={() => setStep((s) => s - 1)}
+              className="rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40"
+              style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+              Back
+            </button>
+            {step < steps.length - 1 && (
+              <button type="button" onClick={() => setStep((s) => s + 1)}
+                className="rounded-xl px-4 py-2 text-sm font-medium"
+                style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                Next
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose}
+              className="rounded-xl px-4 py-2 text-sm font-medium"
+              style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+              Cancel
+            </button>
+            <button type="button" onClick={handleSave} disabled={saving}
+              className="rounded-xl px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              style={{ background: 'var(--color-teal)' }}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
