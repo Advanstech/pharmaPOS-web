@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertTriangle, ChevronRight, Package, Plus } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Package, Plus, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -184,17 +184,28 @@ export default function InventoryPage() {
             {loading ? 'Syncing stock intelligence...' : `${inventory.length} products tracked — open a row to receive, adjust, and view movement history`}
           </p>
         </div>
-        {canCreateProducts && (
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-            style={{ background: 'var(--color-teal)' }}
-          >
-            <Plus size={15} />
-            Add product
-          </button>
-        )}
+        <div className="flex gap-2">
+          {canCreateProducts && (
+            <Link
+              href="/dashboard/inventory/receive"
+              className="inline-flex items-center gap-2 rounded-lg border border-teal px-4 py-2 text-sm font-semibold text-teal hover:bg-teal/5 transition-colors"
+            >
+              <Truck size={15} />
+              Receive stock
+            </Link>
+          )}
+          {canCreateProducts && (
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+              style={{ background: 'var(--color-teal)' }}
+            >
+              <Plus size={15} />
+              Add product
+            </button>
+          )}
+        </div>
       </div>
 
       {user && (
