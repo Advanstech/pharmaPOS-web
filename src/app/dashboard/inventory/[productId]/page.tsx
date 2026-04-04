@@ -10,6 +10,7 @@ import { INVENTORY_LIST_QUERY, STOCK_MOVEMENTS_QUERY } from '@/lib/graphql/inven
 import { ADJUST_STOCK_MUTATION, RECEIVE_STOCK_MUTATION } from '@/lib/graphql/inventory.mutations';
 import { PharmaProductVisual } from '@/components/dashboard/executive/pharma-product-visual';
 import { canAdjustStock, canReceiveStock } from '@/lib/auth/inventory-access';
+import { ProductEditModal } from '@/components/inventory/product-edit-modal';
 import { cn } from '@/lib/utils';
 
 const UUID_RE =
@@ -73,6 +74,8 @@ export default function InventoryProductDetailPage() {
   const [adjustBatch, setAdjustBatch] = useState('');
   const [adjustExpiry, setAdjustExpiry] = useState('');
   const [formMessage, setFormMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const canEditProduct = ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(role ?? '');
 
   const { data: invData, loading: invLoading, error: invError } = useQuery<{ inventory: InventoryRow[] }>(
     INVENTORY_LIST_QUERY,
@@ -249,6 +252,15 @@ export default function InventoryProductDetailPage() {
                 >
                   {item.classification}
                 </span>
+                {canEditProduct && (
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-surface-border px-2.5 py-1 text-xs font-bold text-content-secondary hover:bg-surface-hover hover:text-teal transition-colors"
+                  >
+                    <SlidersHorizontal size={12} /> Edit
+                  </button>
+                )}
               </div>
               <p className="mt-1 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                 {item.productId}
@@ -586,6 +598,14 @@ export default function InventoryProductDetailPage() {
             )}
           </div>
         </>
+      )}
+
+      {item && (
+        <ProductEditModal
+          product={item}
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+        />
       )}
     </div>
   );

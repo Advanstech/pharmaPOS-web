@@ -1,20 +1,21 @@
 'use client';
 
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { PhoneCall, Mail, AlertTriangle, Package, ChevronDown } from 'lucide-react';
+import { PhoneCall, Mail, AlertTriangle, Package, ChevronDown, Plus, Pencil, Trash2 } from 'lucide-react';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { canAccessInventoryWorkspace } from '@/lib/auth/inventory-access';
 import type { UserRole } from '@/types';
-import { SUPPLIER_RESTOCK_WATCH } from '@/lib/graphql/suppliers.queries';
+import { SUPPLIER_RESTOCK_WATCH, DELETE_SUPPLIER_MUTATION, SUPPLIERS_LIST_QUERY, SUPPLIER_DETAIL_QUERY } from '@/lib/graphql/suppliers.queries';
 import { Pagination } from '@/components/ui/pagination';
 import { PharmaProductVisual } from '@/components/dashboard/executive/pharma-product-visual';
 import { StockLevelGauge } from '@/components/dashboard/executive/stock-level-gauge';
 import { SupplierHealthDonut } from '@/components/dashboard/executive/supplier-health-donut';
+import { SupplierFormModal } from '@/components/suppliers/supplier-form-modal';
 
 type StockStatus = 'ok' | 'low' | 'critical' | 'out';
 
@@ -52,15 +53,45 @@ export default function SuppliersPage() {
   const highlightSupplierId = searchParams.get('supplierId');
   const { user } = useAuthStore();
   const canStock = user ? canAccessInventoryWorkspace(user.role as UserRole) : false;
+  const canManageSuppliers = ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(user?.role ?? '');
+  const isOwner = user?.role === 'owner';
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'attention'>('all');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<{ id: string; name: string; contactName?: string | null; phone?: string | null; email?: string | null; address?: string | null } | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const { data, loading, error } = useQuery<{ supplierRestockWatch: SupplierWatch[] }>(
     SUPPLIER_RESTOCK_WATCH,
     { fetchPolicy: 'cache-and-network', pollInterval: 15_000 },
   );
+
+  const [deleteSupplier] = useMutation(DELETE_SUPPLIER_MUTATION, {
+    refetchQueries: [{ query: SUPPLIER_RESTOCK_WATCH }, { query: SUPPLIERS_LIST_QUERY }],
+  });
+
+  const handleDeactivate = async (id: string) => {
+    try {
+      await deleteSupplier({ variables: { id } });
+      setDeactivatingId(null);
+    } catch (e) {
+      console.error('Failed to deactivate supplier:', e);
+      setDeactivatingId(null);
+    }
+  };
+
+  const handleEditClick = async (s: SupplierWatch) => {
+    // We have basic info from the watch query; open the form with what we have
+    setEditingSupplier({
+      id: s.supplierId,
+      name: s.supplierName,
+      phone: s.supplierPhone,
+      email: s.supplierEmail,
+    });
+    setFormOpen(true);
+  };
 
   const suppliers = data?.supplierRestockWatch ?? [];
 
@@ -123,6 +154,15 @@ export default function SuppliersPage() {
             Visual stock watch · call queue syncs with live inventory
           </p>
         </div>
+        {canManageSuppliers && (
+          <button
+            type="button"
+            onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-teal px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-teal-dark active:scale-95"
+          >
+            <Plus size={16} /> New Supplier
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -215,9 +255,16 @@ export default function SuppliersPage() {
             key={supplier.supplierId}
             supplier={supplier}
             canStock={canStock}
+            canManage={canManageSuppliers}
+            ownerOnly={isOwner}
+            deactivatingId={deactivatingId}
             highlightSupplierId={highlightSupplierId}
             searchQuery={search}
             isFirstOnPage={index === 0}
+            onEdit={handleEditClick}
+            onDeactivate={(id) => setDeactivatingId(id)}
+            onConfirmDeactivate={handleDeactivate}
+            onCancelDeactivate={() => setDeactivatingId(null)}
           />
         ))}
       </div>
@@ -233,6 +280,12 @@ export default function SuppliersPage() {
           />
         </div>
       )}
+
+      <SupplierFormModal
+        supplier={editingSupplier}
+        open={formOpen}
+        onClose={() => { setFormOpen(false); setEditingSupplier(null); }}
+      />
     </div>
   );
 }
@@ -277,15 +330,29 @@ function Badge({ text, status }: { text: string; status: StockStatus }) {
 function SupplierDisclosure({
   supplier,
   canStock,
+  canManage,
+  ownerOnly,
+  deactivatingId,
   highlightSupplierId,
   searchQuery,
   isFirstOnPage,
+  onEdit,
+  onDeactivate,
+  onConfirmDeactivate,
+  onCancelDeactivate,
 }: {
   supplier: SupplierWatch;
   canStock: boolean;
+  canManage: boolean;
+  ownerOnly: boolean;
+  deactivatingId: string | null;
   highlightSupplierId: string | null;
   searchQuery: string;
   isFirstOnPage: boolean;
+  onEdit: (s: SupplierWatch) => void;
+  onDeactivate: (id: string) => void;
+  onConfirmDeactivate: (id: string) => Promise<void>;
+  onCancelDeactivate: () => void;
 }) {
   const needsAction = supplier.outOfStockCount + supplier.criticalStockCount + supplier.lowStockCount > 0;
   const highlight = highlightSupplierId?.trim() ?? '';
@@ -378,6 +445,44 @@ function SupplierDisclosure({
               <Mail size={12} />
               Email
             </a>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(supplier); }}
+              className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-bold transition-colors hover:bg-surface-hover"
+              style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+            >
+              <Pencil size={11} /> Edit
+            </button>
+          )}
+          {ownerOnly && deactivatingId !== supplier.supplierId && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDeactivate(supplier.supplierId); }}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-red-600 transition-colors hover:bg-red-50"
+            >
+              <Trash2 size={11} /> Remove
+            </button>
+          )}
+          {ownerOnly && deactivatingId === supplier.supplierId && (
+            <span className="inline-flex items-center gap-1 text-[11px]" onClick={(e) => e.stopPropagation()}>
+              <span className="font-bold text-red-600">Sure?</span>
+              <button
+                type="button"
+                onClick={() => onConfirmDeactivate(supplier.supplierId)}
+                className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-red-700"
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => onCancelDeactivate()}
+                className="text-[10px] font-bold text-content-muted hover:text-content-primary"
+              >
+                No
+              </button>
+            </span>
           )}
         </div>
       </summary>

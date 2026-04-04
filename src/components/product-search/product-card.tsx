@@ -85,7 +85,7 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
       )}
     >
       {/* Left: thumbnail — glare only here so it never covers text */}
-      <div className="relative h-full min-h-0 w-[92px] shrink-0 overflow-hidden rounded-[14px] border border-surface-border bg-surface-hover shadow-inner sm:w-[100px]">
+      <div className="relative h-full min-h-0 w-[84px] shrink-0 overflow-hidden rounded-[14px] border border-surface-border bg-surface-hover shadow-inner sm:w-[92px]">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-7 rounded-t-[13px] bg-gradient-to-b from-white/25 to-transparent dark:from-white/10" />
         <ProductImage
           src={product.image?.urlThumb ?? product.image?.cdnUrl}
@@ -120,7 +120,7 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
         </div>
 
         <div className="min-h-0 min-w-0 overflow-hidden">
-          <h3 className="line-clamp-2 break-words text-[12px] font-extrabold leading-tight tracking-tight text-content-primary sm:text-[13px]">
+          <h3 className="line-clamp-2 break-words text-[13px] font-extrabold leading-tight tracking-tight text-content-primary sm:text-[14px]">
             {product.name}
           </h3>
           {product.genericName ? (
@@ -162,14 +162,16 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
         </div>
 
         <div
-          className="flex shrink-0 items-end justify-between gap-1.5 border-t pt-1"
+          className="flex shrink-0 items-end justify-between gap-1 border-t pt-1"
           style={{ borderColor: 'var(--surface-border)' }}
         >
-          <div className="min-w-0 flex-1">
-            <GhsMoney
-              amount={product.unitPrice / 100}
-              className="block text-[15px] font-extrabold leading-none tracking-tight text-teal sm:text-[16px]"
-            />
+          <div className="min-w-0 flex-1 max-w-[calc(100%-40px)]">
+            <div className="flex items-baseline whitespace-nowrap">
+              <GhsMoney
+                amount={product.unitPrice / 100}
+                className="text-[13px] font-extrabold leading-none tracking-tight text-teal sm:text-[14px]"
+              />
+            </div>
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0 text-[10px] font-bold leading-tight text-content-muted">
               <Store size={10} className="shrink-0" />
               <span

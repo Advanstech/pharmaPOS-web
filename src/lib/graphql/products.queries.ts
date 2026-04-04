@@ -72,3 +72,33 @@ export const STOCK_CHANGED_SUBSCRIPTION = gql`
     }
   }
 `;
+
+export const UPDATE_PRODUCT_MUTATION = gql`
+  mutation UpdateProduct($id: String!, $input: UpdateProductInput!) {
+    updateProduct(id: $id, input: $input) {
+      id
+      name
+      genericName
+      barcode
+      unitPrice
+      classification
+      branchType
+      vatExempt
+      requiresRx
+      supplier {
+        id
+        name
+      }
+      category {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const DEACTIVATE_PRODUCT_MUTATION = gql`
+  mutation DeactivateProduct($id: String!) {
+    deactivateProduct(id: $id)
+  }
+`;
