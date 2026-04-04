@@ -173,14 +173,14 @@ const S = {
   },
   input: {
     width: '100%',
-    height: 50,
+    height: 56,
     padding: '0 16px',
     borderRadius: 12,
     borderWidth: '1.5px',
     borderStyle: 'solid',
     borderColor: 'var(--surface-border)',
     background: 'var(--surface-base)',
-    fontSize: 14,
+    fontSize: 16,
     color: 'var(--text-primary)',
     fontFamily: 'inherit',
     outline: 'none',
@@ -196,14 +196,14 @@ const S = {
     position: 'relative' as const,
   },
   inputPw: {
-    paddingRight: 50,
+    paddingRight: 56,
   },
   pwToggle: {
     position: 'absolute' as const,
     right: 0,
     top: 0,
-    height: 50,
-    width: 50,
+    height: 56,
+    width: 56,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -212,7 +212,12 @@ const S = {
     border: 'none',
     cursor: 'pointer',
     borderRadius: '0 12px 12px 0',
-    transition: 'color 0.15s',
+    transition: 'color 0.15s, background 0.15s',
+    touchAction: 'manipulation',
+  },
+  pwToggleActive: {
+    background: 'rgba(0,109,119,0.08)',
+    color: 'var(--color-teal)',
   },
   error: {
     display: 'flex',
@@ -235,11 +240,11 @@ const S = {
     flexShrink: 0,
   },
   btn: {
-    height: 52,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: 16,
     border: 'none',
     cursor: 'pointer',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 600,
     letterSpacing: '0.01em',
     color: '#fff',
@@ -251,8 +256,14 @@ const S = {
     gap: 8,
     width: '100%',
     marginTop: 4,
-    transition: 'opacity 0.15s, box-shadow 0.15s',
+    transition: 'opacity 0.15s, box-shadow 0.15s, transform 0.1s',
     fontFamily: 'inherit',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'rgba(0,0,0,0)',
+  },
+  btnActive: {
+    transform: 'scale(0.98)',
+    boxShadow: '0 2px 10px rgba(0,109,119,0.25)',
   },
   btnDisabled: {
     opacity: 0.42,
@@ -301,6 +312,8 @@ export default function LoginPage() {
   const [shaking, setShaking]   = useState(false);
   const [emailFocus, setEmailFocus]   = useState(false);
   const [pwFocus, setPwFocus]         = useState(false);
+  const [btnActive, setBtnActive]     = useState(false);
+  const [eyeActive, setEyeActive]     = useState(false);
 
   const [login, { loading }] = useMutation<LoginResult>(LOGIN_MUTATION);
 
@@ -315,31 +328,32 @@ export default function LoginPage() {
   // Inject keyframes once on mount
   useEffect(() => {
     const id = 'pharmapos-login-keyframes';
-    if (document.getElementById(id)) return;
-    const style = document.createElement('style');
-    style.id = id;
-    style.textContent = `
-      @keyframes blobDrift {
-        0%   { transform: translate(0,0) scale(1); }
-        50%  { transform: translate(28px,-18px) scale(1.07); }
-        100% { transform: translate(-18px,28px) scale(0.94); }
-      }
-      @keyframes loginShake {
-        0%,100% { transform: translateX(0); }
-        15%     { transform: translateX(-7px); }
-        30%     { transform: translateX(7px); }
-        45%     { transform: translateX(-5px); }
-        60%     { transform: translateX(5px); }
-        75%     { transform: translateX(-3px); }
-        90%     { transform: translateX(3px); }
-      }
-      @keyframes loginSpin {
-        to { transform: rotate(360deg); }
-      }
-      .login-shake { animation: loginShake 0.52s cubic-bezier(0.36,0.07,0.19,0.97); }
-      .login-spin  { animation: loginSpin 0.75s linear infinite; }
-    `;
-    document.head.appendChild(style);
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = `
+        @keyframes blobDrift {
+          0%   { transform: translate(0,0) scale(1); }
+          50%  { transform: translate(28px,-18px) scale(1.07); }
+          100% { transform: translate(-18px,28px) scale(0.94); }
+        }
+        @keyframes loginShake {
+          0%,100% { transform: translateX(0); }
+          15%     { transform: translateX(-7px); }
+          30%     { transform: translateX(7px); }
+          45%     { transform: translateX(-5px); }
+          60%     { transform: translateX(5px); }
+          75%     { transform: translateX(-3px); }
+          90%     { transform: translateX(3px); }
+        }
+        @keyframes loginSpin {
+          to { transform: rotate(360deg); }
+        }
+        .login-shake { animation: loginShake 0.52s cubic-bezier(0.36,0.07,0.19,0.97); }
+        .login-spin  { animation: loginSpin 0.75s linear infinite; }
+      `;
+      document.head.appendChild(style);
+    }
     setMounted(true);
   }, []);
 
@@ -472,7 +486,12 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
-                  style={S.pwToggle}
+                  onTouchStart={() => setEyeActive(true)}
+                  onTouchEnd={() => setEyeActive(false)}
+                  onMouseDown={() => setEyeActive(true)}
+                  onMouseUp={() => setEyeActive(false)}
+                  onMouseLeave={() => setEyeActive(false)}
+                  style={{...S.pwToggle, ...(eyeActive ? S.pwToggleActive : {})}}
                   aria-label={showPw ? 'Hide password' : 'Show password'}
                 >
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -502,7 +521,16 @@ export default function LoginPage() {
               type="submit"
               disabled={isDisabled}
               suppressHydrationWarning
-              style={{ ...S.btn, ...(isDisabled ? S.btnDisabled : {}) }}
+              style={{ 
+                ...S.btn, 
+                ...(isDisabled ? S.btnDisabled : {}),
+                ...(btnActive ? S.btnActive : {}),
+              }}
+              onTouchStart={() => setBtnActive(true)}
+              onTouchEnd={() => setBtnActive(false)}
+              onMouseDown={() => setBtnActive(true)}
+              onMouseUp={() => setBtnActive(false)}
+              onMouseLeave={() => setBtnActive(false)}
               whileHover={prefersReduced || isDisabled ? {} : { scale: 1.015, boxShadow: '0 6px 28px rgba(0,109,119,0.55)' }}
               whileTap={prefersReduced || isDisabled ? {} : { scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
