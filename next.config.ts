@@ -1,9 +1,16 @@
 import type { NextConfig } from 'next';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+/** Monorepo root (pnpm-workspace.yaml) — avoids Turbopack picking a stray lockfile higher in the tree. */
+const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ['three'],
+  turbopack: {
+    root: monorepoRoot,
+  },
   allowedDevOrigins: ['192.168.100.66'],
   images: {
     remotePatterns: [

@@ -12,14 +12,15 @@ pnpm dev                     # http://localhost:3000
 
 ## Environment Variables
 
-Create `.env.local` (never commit it):
+Copy the example and adjust if needed:
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=ws://localhost:4000/graphql
+```bash
+cp .env.example .env.local
 ```
 
-For production point these at your deployed API URL.
+`apps/web/.env.example` defaults **`NEXT_PUBLIC_API_URL`** and **`API_PROXY_TARGET`** to the **Railway** API (`happy-happiness-production-fd76.up.railway.app`). For a **local** Nest API instead, set both to `http://127.0.0.1:4000`.
+
+**CORS:** When the browser calls the Railway API from `http://localhost:3000`, the API’s **`WEB_URL`** on Railway must include `http://localhost:3000` (comma-separated with production origins).
 
 ## Test Credentials
 
