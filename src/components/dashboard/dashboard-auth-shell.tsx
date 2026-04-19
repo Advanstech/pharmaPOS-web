@@ -14,6 +14,7 @@ import { OfflineBanner } from '@/components/pos/offline-banner';
 import { MobileTopBar } from '@/components/dashboard/mobile-top-bar';
 import { warmOfflineCache } from '@/lib/offline/warm-offline-cache';
 import { useApolloClient } from '@apollo/client';
+import { PageTransition } from '@/components/dashboard/page-transition';
 
 function DashboardAuthLoading() {
   return (
@@ -90,7 +91,9 @@ export function DashboardAuthShell({ children }: { children: React.ReactNode }) 
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div ref={mainContentRef} className="min-h-full relative">
-            <ErrorBoundary>{children}</ErrorBoundary>
+            <ErrorBoundary>
+              <PageTransition>{children}</PageTransition>
+            </ErrorBoundary>
           </div>
         </main>
       </div>

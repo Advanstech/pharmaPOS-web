@@ -117,6 +117,8 @@ export function Sidebar() {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05, duration: 0.2 }}
+                whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+                whileHover={prefersReducedMotion ? {} : { x: active ? 0 : 2 }}
               >
                 <Link
                   href={item.href}

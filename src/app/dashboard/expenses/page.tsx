@@ -79,7 +79,11 @@ export default function ExpensesPage() {
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
               </Link>
               <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Expense Management</h1>
-              <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>Track, approve, and reimburse staff expense claims</p>
+              <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+                {canApprove
+                  ? 'Track, approve, and reimburse all staff expense claims'
+                  : 'Your submitted expense claims'}
+              </p>
             </div>
             <Link href="/dashboard/expenses/new"
               className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:shadow-xl"
