@@ -102,3 +102,25 @@ export const DEACTIVATE_PRODUCT_MUTATION = gql`
     deactivateProduct(id: $id)
   }
 `;
+
+export const UPLOAD_PRODUCT_IMAGE_MUTATION = gql`
+  mutation UploadProductImage(
+    $productId: String!
+    $fileBase64: String!
+    $filename: String!
+    $mimetype: String!
+  ) {
+    uploadProductImage(
+      productId: $productId
+      fileBase64: $fileBase64
+      filename: $filename
+      mimetype: $mimetype
+    ) {
+      id
+      cdnUrl
+      urlThumb
+      source
+      isApproved
+    }
+  }
+`;

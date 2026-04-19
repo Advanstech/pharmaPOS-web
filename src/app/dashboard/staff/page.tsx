@@ -7,12 +7,13 @@ import {
   UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye,
   LayoutGrid, List, Search, Filter, X, Wifi, WifiOff, Clock, Building2,
   TrendingUp, Users, UserCheck, AlertCircle, ChevronDown, Banknote,
-  GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase,
+  GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   LIST_STAFF, STAFF_MEMBER, STAFF_SESSION_HISTORY,
   INVITE_STAFF, DEACTIVATE_STAFF, RESET_STAFF_PASSWORD, UPDATE_STAFF_PROFILE,
+  STAFF_ACTIVITY_LOG,
 } from '@/lib/graphql/dashboard.queries';
 import { formatApolloError } from '@/lib/apollo/format-apollo-error';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -30,6 +31,7 @@ interface StaffMember {
   branch_id: string;
   is_active: boolean;
   is_on_duty: boolean;
+  last_seen_at?: string;
   position?: string;
   department?: string;
   employment_type?: string;
@@ -179,41 +181,53 @@ function StaffAvatar({ member, size = 48 }: { member: StaffMember; size?: number
 function StaffKpiBar({ staff }: { staff: StaffMember[] }) {
   const total = staff.length;
   const onDuty = staff.filter((s) => s.is_on_duty).length;
+  const offline = staff.filter((s) => !s.is_on_duty).length;
   const active = staff.filter((s) => s.is_active).length;
   const incomplete = staff.filter((s) => computeProfileCompletion(s) < 100).length;
 
   const kpis = [
-    { icon: Users, label: 'Total staff', value: total, color: '#006d77' },
-    { icon: Wifi, label: 'On duty now', value: onDuty, color: '#16a34a', pulse: onDuty > 0 },
-    { icon: UserCheck, label: 'Active accounts', value: active, color: '#2563eb' },
-    { icon: AlertCircle, label: 'Profiles incomplete', value: incomplete, color: incomplete > 0 ? '#b45309' : '#64748b' },
+    { icon: Users, label: 'Total staff', value: total, color: '#006d77', gradient: 'linear-gradient(135deg, rgba(0,109,119,0.12), rgba(0,109,119,0.03))' },
+    { icon: Wifi, label: 'On duty now', value: onDuty, color: '#16a34a', pulse: onDuty > 0, gradient: 'linear-gradient(135deg, rgba(22,163,74,0.12), rgba(22,163,74,0.03))' },
+    { icon: WifiOff, label: 'Offline', value: offline, color: '#64748b', gradient: 'linear-gradient(135deg, rgba(100,116,139,0.12), rgba(100,116,139,0.03))' },
+    { icon: UserCheck, label: 'Active accounts', value: active, color: '#2563eb', gradient: 'linear-gradient(135deg, rgba(37,99,235,0.12), rgba(37,99,235,0.03))' },
+    { icon: AlertCircle, label: 'Profiles incomplete', value: incomplete, color: incomplete > 0 ? '#b45309' : '#64748b', gradient: incomplete > 0 ? 'linear-gradient(135deg, rgba(180,83,9,0.12), rgba(180,83,9,0.03))' : 'linear-gradient(135deg, rgba(100,116,139,0.12), rgba(100,116,139,0.03))' },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-5">
       {kpis.map((k, i) => (
         <motion.div
           key={k.label}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06 }}
-          className="rounded-xl p-4"
-          style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--shadow-card)' }}
+          className="rounded-xl p-4 relative overflow-hidden"
+          style={{
+            background: k.gradient,
+            border: '1px solid var(--surface-border)',
+            boxShadow: 'var(--shadow-card)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{k.label}</span>
-            <div className="rounded-lg p-1.5" style={{ background: `${k.color}18` }}>
-              <k.icon size={14} style={{ color: k.color }} />
+          {/* Glass highlight */}
+          <div className="absolute inset-0 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%)', pointerEvents: 'none' }} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{k.label}</span>
+              <div className="rounded-lg p-1.5" style={{ background: `${k.color}18`, boxShadow: `0 0 12px ${k.color}15` }}>
+                <k.icon size={14} style={{ color: k.color }} />
+              </div>
             </div>
-          </div>
-          <div className="flex items-end gap-2">
-            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{k.value}</span>
-            {k.pulse && k.value > 0 && (
-              <span className="mb-1 flex items-center gap-1 text-xs font-medium" style={{ color: '#16a34a' }}>
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                live
-              </span>
-            )}
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{k.value}</span>
+              {k.pulse && k.value > 0 && (
+                <span className="mb-1 flex items-center gap-1 text-xs font-medium" style={{ color: '#16a34a' }}>
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  live
+                </span>
+              )}
+            </div>
           </div>
         </motion.div>
       ))}
@@ -238,31 +252,58 @@ function StaffCard({
   const rc = ROLE_COLORS[member.role] ?? ROLE_COLORS.cashier;
   const completion = computeProfileCompletion(member);
 
+  // "Last seen" — use last_seen_at from sessions, fallback to created_at
+  const lastSeen = member.last_seen_at || member.created_at;
+  const lastSeenLabel = (() => {
+    const diff = Date.now() - new Date(lastSeen).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return formatAccraDate(lastSeen);
+  })();
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 32px rgba(0,109,119,0.12)' }}
+      whileHover={{ y: -2, boxShadow: member.is_on_duty ? '0 8px 32px rgba(22,163,74,0.18)' : '0 8px 32px rgba(0,109,119,0.12)' }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className="relative rounded-2xl p-5 flex flex-col gap-3"
       style={{
         background: 'var(--surface-card)',
         border: member.is_on_duty
-          ? '1.5px solid rgba(22,163,74,0.4)'
+          ? '1.5px solid rgba(22,163,74,0.45)'
           : '1px solid var(--surface-border)',
-        boxShadow: 'var(--shadow-card)',
+        boxShadow: member.is_on_duty
+          ? '0 0 0 1px rgba(22,163,74,0.1), 0 4px 20px rgba(22,163,74,0.08), var(--shadow-card)'
+          : 'var(--shadow-card)',
       }}
     >
-      {/* On-duty banner */}
-      {member.is_on_duty && (
-        <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-          style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-          On duty
-        </div>
-      )}
+      {/* On-duty / Off-duty indicator */}
+      <div className="absolute top-3 left-3">
+        {member.is_on_duty ? (
+          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+            style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d', border: '1px solid rgba(22,163,74,0.2)' }}>
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: '#4ade80' }} />
+              <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: '#16a34a' }} />
+            </span>
+            On duty
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium"
+            style={{ background: 'var(--surface-base)', color: 'var(--text-muted)', border: '1px solid var(--surface-border)' }}>
+            <span className="h-2 w-2 rounded-full" style={{ background: '#94a3b8' }} />
+            Offline
+          </div>
+        )}
+      </div>
 
       {/* Menu */}
       {canManage && (
@@ -369,6 +410,12 @@ function StaffCard({
             {formatGhs(member.salary_amount_pesewas)}/{member.salary_period?.replace('ly','') ?? 'mo'}
           </span>
         )}
+      </div>
+
+      {/* Last seen */}
+      <div className="flex items-center gap-1.5 text-[10px] pt-1" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--surface-border)' }}>
+        <Clock size={10} />
+        <span>Last seen {lastSeenLabel}</span>
       </div>
     </motion.div>
   );
@@ -595,58 +642,83 @@ export default function StaffPage() {
           <p className="mt-1 text-xs font-medium">{formatApolloError(listStaffError)}</p>
         </div>
       ) : null}
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Staff Management</h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {allStaff.length} member{allStaff.length !== 1 ? 's' : ''} ·{' '}
-            <span style={{ color: '#16a34a' }}>{allStaff.filter((s) => s.is_on_duty).length} on duty</span>
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Tab switcher */}
-          <div className="inline-flex rounded-xl p-0.5"
-            style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
-            {(['roster', 'activity'] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setTab(t)}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors capitalize"
-                style={{
-                  background: tab === t ? 'var(--surface-card)' : 'transparent',
-                  color: tab === t ? 'var(--text-primary)' : 'var(--text-muted)',
-                  boxShadow: tab === t ? 'var(--shadow-card)' : 'none',
-                }}>
-                {t === 'activity' ? <span className="flex items-center gap-1.5"><LogIn size={13} />Sign-in activity</span> : 'Team roster'}
-              </button>
-            ))}
-          </div>
+      {/* Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-6 rounded-2xl p-6 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, #004e57 0%, #006d77 50%, #0e7490 100%)',
+          boxShadow: '0 4px 24px rgba(0,109,119,0.3)',
+        }}
+      >
+        {/* Decorative circles */}
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full" style={{ background: 'rgba(255,255,255,0.04)' }} />
+        <div className="absolute top-1/2 right-1/4 w-20 h-20 rounded-full" style={{ background: 'rgba(255,255,255,0.03)' }} />
 
-          {/* View toggle (roster only) */}
-          {tab === 'roster' && (
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="rounded-xl p-2.5" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+                <Users size={22} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white tracking-tight">Staff Command Center</h1>
+                <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {allStaff.length} team member{allStaff.length !== 1 ? 's' : ''} ·{' '}
+                  <span className="inline-flex items-center gap-1" style={{ color: '#86efac' }}>
+                    <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: '#4ade80' }} />
+                    {allStaff.filter((s) => s.is_on_duty).length} on duty now
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Tab switcher */}
             <div className="inline-flex rounded-xl p-0.5"
-              style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
-              {([['grid', LayoutGrid], ['list', List]] as const).map(([mode, Icon]) => (
-                <button key={mode} type="button" onClick={() => setViewMode(mode)}
-                  className="rounded-lg p-2 transition-colors"
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+              {(['roster', 'activity'] as const).map((t) => (
+                <button key={t} type="button" onClick={() => setTab(t)}
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors capitalize"
                   style={{
-                    background: viewMode === mode ? 'var(--surface-card)' : 'transparent',
-                    color: viewMode === mode ? 'var(--color-teal)' : 'var(--text-muted)',
+                    background: tab === t ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    color: tab === t ? '#ffffff' : 'rgba(255,255,255,0.6)',
                   }}>
-                  <Icon size={15} />
+                  {t === 'activity' ? <span className="flex items-center gap-1.5"><LogIn size={13} />Sign-in activity</span> : 'Team roster'}
                 </button>
               ))}
             </div>
-          )}
 
-          {canManage && tab === 'roster' && (
-            <button onClick={() => setShowInvite(true)}
-              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all"
-              style={{ background: 'linear-gradient(135deg,var(--color-teal-dark),var(--color-teal))', minHeight: 44, boxShadow: '0 2px 12px rgba(0,109,119,0.35)' }}>
-              <UserPlus size={15} /> Invite staff
-            </button>
-          )}
+            {/* View toggle (roster only) */}
+            {tab === 'roster' && (
+              <div className="inline-flex rounded-xl p-0.5"
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+                {([['grid', LayoutGrid], ['list', List]] as const).map(([mode, Icon]) => (
+                  <button key={mode} type="button" onClick={() => setViewMode(mode)}
+                    className="rounded-lg p-2 transition-colors"
+                    style={{
+                      background: viewMode === mode ? 'rgba(255,255,255,0.2)' : 'transparent',
+                      color: viewMode === mode ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                    }}>
+                    <Icon size={15} />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {canManage && tab === 'roster' && (
+              <button onClick={() => setShowInvite(true)}
+                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff', minHeight: 44, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}>
+                <UserPlus size={15} /> Invite staff
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </motion.div>
 
       {tab === 'roster' && (
         <>
@@ -683,6 +755,26 @@ export default function StaffPage() {
             statusFilter={statusFilter} setStatusFilter={setStatusFilter}
             dutyFilter={dutyFilter} setDutyFilter={setDutyFilter}
           />
+
+          {/* View toggle — prominent below filters */}
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              {filtered.length} staff member{filtered.length !== 1 ? 's' : ''}
+            </p>
+            <div className="inline-flex rounded-xl p-1" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+              {([['grid', LayoutGrid, 'Cards'], ['list', List, 'List']] as const).map(([mode, Icon, label]) => (
+                <button key={mode} type="button" onClick={() => setViewMode(mode)}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all"
+                  style={{
+                    background: viewMode === mode ? 'var(--color-teal)' : 'transparent',
+                    color: viewMode === mode ? '#fff' : 'var(--text-muted)',
+                    boxShadow: viewMode === mode ? '0 2px 8px rgba(13,148,136,0.3)' : 'none',
+                  }}>
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Grid view */}
           {viewMode === 'grid' && (
@@ -951,71 +1043,129 @@ function ActivityTab({ sessions, loading, error, showBranchColumn, page, hasNext
 }) {
   return (
     <div className="rounded-2xl overflow-hidden"
-      style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
-      <div className="flex items-center gap-2 border-b px-4 py-3"
-        style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-base)' }}>
-        <Wifi size={14} style={{ color: '#16a34a' }} />
-        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-          Live sign-in activity · last 14 Accra calendar days · auto-refreshes
-        </p>
+      style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+      <div className="flex items-center justify-between border-b px-5 py-3"
+        style={{ borderColor: 'var(--surface-border)', background: 'linear-gradient(135deg, rgba(0,109,119,0.06), rgba(0,109,119,0.02))' }}>
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg p-1.5" style={{ background: 'rgba(22,163,74,0.12)' }}>
+            <Wifi size={14} style={{ color: '#16a34a' }} />
+          </div>
+          <div>
+            <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Live Sign-In Activity</p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Last 14 Accra calendar days · auto-refreshes</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: '#16a34a' }} />
+            Active
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ background: '#94a3b8' }} />
+            Ended
+          </span>
+        </div>
       </div>
-      {error && <p className="px-4 py-3 text-sm" style={{ color: '#dc2626' }}>{error}</p>}
+      {error && <p className="px-5 py-3 text-sm" style={{ color: '#dc2626' }}>{error}</p>}
       {loading ? <TableSkeleton /> : (
-        <table className="w-full text-sm min-w-[720px]">
-          <thead>
-            <tr className="text-left text-xs font-medium uppercase tracking-wide"
-              style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)', color: 'var(--text-muted)' }}>
-              <th className="px-4 py-3">User</th>
-              <th className="px-4 py-3">Role</th>
-              {showBranchColumn && <th className="px-4 py-3 hidden md:table-cell">Branch</th>}
-              <th className="px-4 py-3">Signed in</th>
-              <th className="px-4 py-3 hidden lg:table-cell">Last active</th>
-              <th className="px-4 py-3">Ended</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((row) => (
-              <tr key={row.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--text-primary)' }}>{row.user_name}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  {ROLE_LABELS[row.user_role] ?? row.user_role}
-                </td>
-                {showBranchColumn && (
-                  <td className="hidden px-4 py-3 text-xs md:table-cell" style={{ color: 'var(--text-muted)' }}>
-                    {row.branch_name}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="text-left text-[10px] font-bold uppercase tracking-wider"
+                style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>
+                <th className="px-5 py-3">Staff Member</th>
+                <th className="px-4 py-3">Role</th>
+                {showBranchColumn && <th className="px-4 py-3 hidden md:table-cell">Branch</th>}
+                <th className="px-4 py-3">Signed In</th>
+                <th className="px-4 py-3 hidden lg:table-cell">Last Active</th>
+                <th className="px-4 py-3">Ended</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-right">Profile</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((row) => {
+                const rc = ROLE_COLORS[row.user_role] ?? ROLE_COLORS.cashier;
+                return (
+                  <tr key={row.id}
+                    className="transition-colors hover:bg-[rgba(0,0,0,0.015)]"
+                    style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                          style={{ background: avatarGradient(row.user_name) }}>
+                          {getInitials(row.user_name)}
+                          {row.is_open && (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2"
+                              style={{ background: '#16a34a', borderColor: 'var(--surface-card)' }} />
+                          )}
+                        </div>
+                        <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{row.user_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                        style={{ background: rc.bg, color: rc.text }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: rc.dot }} />
+                        {ROLE_LABELS[row.user_role] ?? row.user_role}
+                      </span>
+                    </td>
+                    {showBranchColumn && (
+                      <td className="hidden px-4 py-3 text-xs md:table-cell" style={{ color: 'var(--text-muted)' }}>
+                        {row.branch_name}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                      {formatAccraDateTime(row.started_at)}
+                    </td>
+                    <td className="hidden px-4 py-3 text-xs font-mono lg:table-cell" style={{ color: 'var(--text-muted)' }}>
+                      {formatAccraDateTime(row.last_seen_at)}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {row.ended_at ? formatAccraDateTime(row.ended_at) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {row.is_open ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold"
+                          style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d', border: '1px solid rgba(22,163,74,0.2)' }}>
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: '#4ade80' }} />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: '#16a34a' }} />
+                          </span>
+                          Online
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
+                          style={{ background: 'var(--surface-base)', color: 'var(--text-muted)', border: '1px solid var(--surface-border)' }}>
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#94a3b8' }} />
+                          Ended
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <a href={`/dashboard/staff/${row.userId}`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all hover:scale-105"
+                        style={{ background: 'rgba(0,109,119,0.08)', color: 'var(--color-teal)' }}>
+                        <Eye size={11} /> View
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && sessions.length === 0 && !error && (
+                <tr>
+                  <td colSpan={showBranchColumn ? 8 : 7} className="px-5 py-16 text-center">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'rgba(0,109,119,0.08)' }}>
+                      <Clock size={20} style={{ color: 'var(--color-teal)' }} />
+                    </div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No sign-in activity yet</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Activity will appear here when staff members log in.</p>
                   </td>
-                )}
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  {formatAccraDateTime(row.started_at)}
-                </td>
-                <td className="hidden px-4 py-3 text-xs lg:table-cell" style={{ color: 'var(--text-muted)' }}>
-                  {formatAccraDateTime(row.last_seen_at)}
-                </td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {row.ended_at ? formatAccraDateTime(row.ended_at) : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={row.is_open
-                      ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
-                      : { background: 'var(--surface-border)', color: 'var(--text-muted)' }}>
-                    {row.is_open && <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />}
-                    {row.is_open ? 'Active' : 'Ended'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {!loading && sessions.length === 0 && !error && (
-              <tr>
-                <td colSpan={showBranchColumn ? 7 : 6} className="px-4 py-12 text-center text-sm"
-                  style={{ color: 'var(--text-muted)' }}>
-                  No sign-in activity in this range yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
       {(sessions.length > 0 || page > 1) && (
         <div className="flex items-center justify-between gap-3 border-t px-4 py-3"
@@ -1145,7 +1295,13 @@ function StaffDetailsModal({ member, loading, errorMessage, onEdit, onClose }: {
               <DetailRow icon={BadgeCheck} label="Account status"
                 value={member.is_active ? 'Active' : 'Deactivated'}
                 valueColor={member.is_active ? '#15803d' : '#dc2626'} />
+              <DetailRow icon={Wifi} label="Online status"
+                value={member.is_on_duty ? '🟢 Online now' : '⚫ Offline'}
+                valueColor={member.is_on_duty ? '#15803d' : '#64748b'} />
             </Section>
+
+            {/* Recent Activity */}
+            <StaffActivitySection userId={member.id} />
           </div>
         )}
 
@@ -1198,6 +1354,71 @@ function DetailRow({ icon: Icon, label, value, mono, valueColor }: {
         {value ?? '—'}
       </span>
     </div>
+  );
+}
+
+// ── Staff Activity Section ────────────────────────────────────────────────────
+
+const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
+  STAFF_ACTIVITY: { label: 'Page/Service', color: '#2563eb' },
+  STOCK_RECEIVED: { label: 'Stock Received', color: '#0f766e' },
+  STOCK_ADJUSTED: { label: 'Stock Adjusted', color: '#d97706' },
+  SALE_COMPLETED: { label: 'Sale', color: '#16a34a' },
+  GRN_CREATED_FROM_OCR: { label: 'Invoice OCR', color: '#7c3aed' },
+  STAFF_INVITED: { label: 'Staff Invited', color: '#2563eb' },
+  STAFF_DEACTIVATED: { label: 'Staff Deactivated', color: '#dc2626' },
+  PASSWORD_RESET: { label: 'Password Reset', color: '#d97706' },
+  LOW_STOCK_ALERT_NOTIFICATION: { label: 'Stock Alert', color: '#ea580c' },
+  PRICE_CHANGED: { label: 'Price Change', color: '#7c3aed' },
+};
+
+function StaffActivitySection({ userId }: { userId: string }) {
+  const { data, loading } = useQuery(STAFF_ACTIVITY_LOG, {
+    variables: { userId, limit: 20 },
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const activities = data?.staffActivityLog ?? [];
+
+  return (
+    <Section title="Recent Activity" icon={Activity}>
+      {loading && activities.length === 0 ? (
+        <div className="px-3 py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>Loading activity…</div>
+      ) : activities.length === 0 ? (
+        <div className="px-3 py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No activity recorded yet</div>
+      ) : (
+        <div className="max-h-48 overflow-y-auto">
+          {activities.map((a: any) => {
+            const info = ACTIVITY_LABELS[a.type] ?? { label: a.type, color: '#64748b' };
+            return (
+              <div key={a.id} className="flex items-center justify-between px-3 py-2 gap-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: info.color }} />
+                  <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                    {info.label}
+                  </span>
+                  {a.operation && a.type === 'STAFF_ACTIVITY' && (
+                    <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                      {a.operation}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {a.durationMs && (
+                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {a.durationMs}ms
+                    </span>
+                  )}
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {new Date(a.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', timeStyle: 'short', dateStyle: 'short' })}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -1516,31 +1737,85 @@ function EditStaffModal({ member, onClose, onSave }: {
 
           {step === 3 && (
             <>
-              <Field label="Profile photo URL">
-                <input type="url" value={form.photo_url} onChange={(e) => {
+              <p className="text-xs font-medium mb-3" style={{ color: 'var(--text-secondary)' }}>
+                Add a profile photo via URL or upload from your device
+              </p>
+
+              {/* Upload option */}
+              <Field label="Upload photo">
+                <div className="flex items-center gap-3">
+                  <label
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 cursor-pointer transition-colors hover:border-teal/50"
+                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-base)' }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        // Convert to data URL for preview and storage
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const dataUrl = reader.result as string;
+                          setPreviewBroken(false);
+                          setForm((prev) => ({ ...prev, photo_url: dataUrl }));
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-muted)' }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                      Click to upload (JPG, PNG)
+                    </span>
+                  </label>
+                </div>
+              </Field>
+
+              {/* OR divider */}
+              <div className="flex items-center gap-3 my-1">
+                <div className="flex-1 h-px" style={{ background: 'var(--surface-border)' }} />
+                <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>or</span>
+                <div className="flex-1 h-px" style={{ background: 'var(--surface-border)' }} />
+              </div>
+
+              {/* URL option */}
+              <Field label="Photo URL">
+                <input type="url" value={form.photo_url.startsWith('data:') ? '' : form.photo_url} onChange={(e) => {
                   setPreviewBroken(false);
                   setForm((prev) => ({ ...prev, photo_url: e.target.value }));
-                }} className="input" placeholder="https://…" />
+                }} className="input" placeholder="https://example.com/photo.jpg" />
               </Field>
+
+              {/* Preview */}
               {form.photo_url.trim() && (
-                <div className="flex items-center gap-4 rounded-xl p-3"
+                <div className="flex items-center gap-4 rounded-xl p-4 mt-2"
                   style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
                   {!previewBroken ? (
                     <img src={form.photo_url.trim()} alt="Preview"
-                      className="h-16 w-16 rounded-full object-cover shrink-0"
-                      style={{ border: '2px solid var(--surface-border)' }}
+                      className="h-20 w-20 rounded-2xl object-cover shrink-0"
+                      style={{ border: '3px solid var(--surface-border)' }}
                       onError={() => setPreviewBroken(true)} />
                   ) : (
-                    <div className="h-16 w-16 rounded-full flex items-center justify-center shrink-0"
+                    <div className="h-20 w-20 rounded-2xl flex items-center justify-center shrink-0"
                       style={{ background: 'var(--surface-border)' }}>
-                      <X size={20} style={{ color: 'var(--text-muted)' }} />
+                      <X size={24} style={{ color: 'var(--text-muted)' }} />
                     </div>
                   )}
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
                     <p className="text-xs mt-0.5" style={{ color: previewBroken ? '#dc2626' : '#15803d' }}>
-                      {previewBroken ? 'Could not load image — check URL' : 'Preview looks good'}
+                      {previewBroken ? 'Could not load image — check URL or try uploading' : '✓ Preview looks good'}
                     </p>
+                    {!previewBroken && (
+                      <button type="button" onClick={() => { setForm(prev => ({ ...prev, photo_url: '' })); }}
+                        className="mt-1 text-[10px] font-bold" style={{ color: '#dc2626' }}>
+                        Remove photo
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

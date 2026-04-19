@@ -49,22 +49,30 @@ export function SupplierHealthDonut({ out, critical, low, ok, height = 200 }: Su
             innerRadius={52}
             outerRadius={72}
             paddingAngle={2}
+            style={{ cursor: 'pointer', touchAction: 'none' }}
           >
             {data.map((entry) => (
               <Cell key={entry.name} fill={entry.color} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
             ))}
           </Pie>
           <Tooltip
-            formatter={(v: number, name: string) => [v, name]}
+            formatter={(v: number, name: string) => [`${v} SKUs`, name]}
             contentStyle={{
-              background: 'var(--surface-card)',
-              border: '1px solid var(--surface-border)',
-              borderRadius: 8,
+              background: '#1a2332',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 10,
               fontSize: 12,
-              color: 'var(--text-primary)',
+              color: '#e2e8f0',
+              padding: '8px 12px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              zIndex: 9999,
+              pointerEvents: 'none' as const,
             }}
-            labelStyle={{ color: 'var(--text-secondary)' }}
-            itemStyle={{ color: 'var(--text-primary)' }}
+            labelStyle={{ color: '#94a3b8', fontWeight: 600 }}
+            itemStyle={{ color: '#e2e8f0', padding: '2px 0' }}
+            wrapperStyle={{ zIndex: 9999, pointerEvents: 'none' as const }}
+            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+            isAnimationActive={false}
           />
           <Legend
             verticalAlign="bottom"

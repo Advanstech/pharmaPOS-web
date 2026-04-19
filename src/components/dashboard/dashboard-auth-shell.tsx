@@ -11,6 +11,9 @@ import { Sidebar } from '@/components/dashboard/sidebar';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { useNestedLenis } from '@/lib/lenis/use-nested-lenis';
 import { OfflineBanner } from '@/components/pos/offline-banner';
+import { MobileTopBar } from '@/components/dashboard/mobile-top-bar';
+import { warmOfflineCache } from '@/lib/offline/warm-offline-cache';
+import { useApolloClient } from '@apollo/client';
 
 function DashboardAuthLoading() {
   return (
@@ -45,6 +48,13 @@ export function DashboardAuthShell({ children }: { children: React.ReactNode }) 
   const allowed =
     !!accessRole && canAccessDashboardPath(accessRole, pathname ?? '/dashboard');
 
+  // Warm offline cache on first load
+  const apolloClient = useApolloClient();
+  useEffect(() => {
+    if (!ready || !user) return;
+    warmOfflineCache(apolloClient, user.branch_id).catch(() => {});
+  }, [ready, user, apolloClient]);
+
   useEffect(() => {
     if (!ready || !user) return;
     const r = roleForAccess(user.role);
@@ -68,7 +78,12 @@ export function DashboardAuthShell({ children }: { children: React.ReactNode }) 
     >
       <OfflineBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar />
+        {/* Sidebar: hidden on mobile, shown on md+ */}
+        <div className="hidden md:flex">
+          <Sidebar />
+        </div>
+        {/* Mobile top bar */}
+        <MobileTopBar />
         <main
           ref={mainScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth"

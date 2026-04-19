@@ -17,6 +17,8 @@ import {
   Settings,
   Newspaper,
   Contact,
+  CalendarCheck,
+  ArrowLeftRight,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 
@@ -96,6 +98,21 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     roles: ['owner', 'se_admin', 'manager'],
   },
   {
+    href: '/dashboard/expenses',
+    label: 'Expenses',
+    icon: Receipt,
+    roles: [
+      'owner',
+      'se_admin',
+      'manager',
+      'head_pharmacist',
+      'pharmacist',
+      'technician',
+      'cashier',
+      'chemical_cashier',
+    ],
+  },
+  {
     href: '/dashboard/pricing',
     label: 'Pricing Control',
     icon: BadgeDollarSign,
@@ -120,12 +137,18 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     href: '/dashboard/inventory',
     label: 'Inventory',
     icon: Package,
-    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist', 'pharmacist', 'technician'],
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist', 'pharmacist', 'technician', 'cashier', 'chemical_cashier'],
   },
   {
     href: '/dashboard/suppliers',
     label: 'Suppliers',
     icon: Truck,
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist', 'pharmacist', 'technician', 'cashier', 'chemical_cashier'],
+  },
+  {
+    href: '/dashboard/invoices',
+    label: 'Invoices',
+    icon: Receipt,
     roles: ['owner', 'se_admin', 'manager', 'head_pharmacist', 'pharmacist', 'technician'],
   },
   {
@@ -139,5 +162,17 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     label: 'Sales',
     icon: Receipt,
     roles: ['owner', 'se_admin', 'manager', 'cashier', 'chemical_cashier', 'pharmacist', 'head_pharmacist'],
+  },
+  {
+    href: '/dashboard/end-of-day',
+    label: 'End of Day',
+    icon: CalendarCheck,
+    roles: ['owner', 'se_admin', 'manager', 'cashier', 'chemical_cashier', 'head_pharmacist'],
+  },
+  {
+    href: '/dashboard/transfers',
+    label: 'Stock Transfers',
+    icon: ArrowLeftRight,
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist', 'pharmacist', 'technician'],
   },
 ];

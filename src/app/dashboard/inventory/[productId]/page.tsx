@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
-import { ArrowLeft, Package, ClipboardList, PlusCircle, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Package, ClipboardList, PlusCircle, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { INVENTORY_LIST_QUERY, STOCK_MOVEMENTS_QUERY } from '@/lib/graphql/inventory.queries';
 import { ADJUST_STOCK_MUTATION, RECEIVE_STOCK_MUTATION } from '@/lib/graphql/inventory.mutations';
@@ -28,6 +28,8 @@ type InventoryRow = {
   nearestExpiry?: string | null;
   supplierId?: string | null;
   supplierName?: string | null;
+  unitPricePesewas?: number | null;
+  unitPriceFormatted?: string | null;
 };
 
 type MovementRow = {
@@ -76,6 +78,13 @@ export default function InventoryProductDetailPage() {
   const [formMessage, setFormMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const canEditProduct = ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(role ?? '');
+
+  // Auto-open edit modal when ?edit=true is in the URL
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true' && canEditProduct) {
+      setEditOpen(true);
+    }
+  }, [searchParams, canEditProduct]);
 
   const { data: invData, loading: invLoading, error: invError } = useQuery<{ inventory: InventoryRow[] }>(
     INVENTORY_LIST_QUERY,
@@ -265,9 +274,14 @@ export default function InventoryProductDetailPage() {
               <p className="mt-1 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                 {item.productId}
               </p>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <Stat label="On hand" value={String(item.quantityOnHand)} accent />
                 <Stat label="Reorder at" value={String(item.reorderLevel)} />
+                <Stat
+                  label="Selling Price"
+                  value={item.unitPriceFormatted || '—'}
+                  accent
+                />
                 <Stat
                   label="Status"
                   value={item.stockStatus}
@@ -286,18 +300,50 @@ export default function InventoryProductDetailPage() {
               </div>
               {item.supplierName && (
                 <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Primary supplier: <span className="font-semibold text-[var(--text-secondary)]">{item.supplierName}</span>
+                  Primary supplier:{' '}
+                  {item.supplierId ? (
+                    <Link href={'/dashboard/suppliers/' + item.supplierId + '/products'} className="font-semibold text-teal hover:underline">
+                      {item.supplierName}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-[var(--text-secondary)]">{item.supplierName}</span>
+                  )}
+                </p>
+              )}
+              {item.unitPricePesewas && item.quantityOnHand > 0 && (
+                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Stock value: <span className="font-semibold text-[var(--text-secondary)]">
+                    GH₵{((item.unitPricePesewas * item.quantityOnHand) / 100).toFixed(2)}
+                  </span>
                 </p>
               )}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link
-                  href="/dashboard/suppliers"
-                  className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[var(--surface-base)]"
-                  style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
-                >
-                  <ClipboardList size={14} />
-                  Supplier queue
-                </Link>
+                {item.supplierId && (
+                  <Link
+                    href={'/dashboard/suppliers/' + item.supplierId + '/products'}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[var(--surface-base)]"
+                    style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+                  >
+                    <ClipboardList size={14} />
+                    Supplier products
+                  </Link>
+                )}
+                {canEditProduct && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to deactivate this product? It will be hidden from POS and inventory.')) {
+                        // Deactivate product via mutation
+                        setFormMessage({ type: 'ok', text: 'Product deactivation requires the product edit modal. Click Edit → toggle Active status.' });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-red-50"
+                    style={{ borderColor: 'rgba(220,38,38,0.2)', color: '#dc2626' }}
+                  >
+                    <Trash2 size={14} />
+                    Remove product
+                  </button>
+                )}
               </div>
           </div>
         </div>
@@ -529,80 +575,15 @@ export default function InventoryProductDetailPage() {
             </p>
           )}
 
-          <div
-            className="mt-8 rounded-2xl border overflow-hidden"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
-          >
-            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'var(--surface-border)' }}>
-              <Package size={16} className="text-[var(--color-teal)]" />
-              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                Recent movements
-              </h2>
-            </div>
-            {movError && (
-              <p className="px-4 py-3 text-sm text-red-700">Could not load movement history.</p>
-            )}
-            {movLoading && movements.length === 0 && (
-              <div className="space-y-2 p-4">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="skeleton h-10 rounded-lg" />
-                ))}
-              </div>
-            )}
-            {!movLoading && movements.length === 0 && !movError && (
-              <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                No movements recorded yet for this SKU.
-              </p>
-            )}
-            {movements.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr
-                      className="text-left text-xs font-semibold uppercase tracking-wide"
-                      style={{ background: 'var(--surface-base)', color: 'var(--text-muted)' }}
-                    >
-                      <th className="px-4 py-2">When</th>
-                      <th className="px-4 py-2">Type</th>
-                      <th className="px-4 py-2">Qty</th>
-                      <th className="px-4 py-2 hidden sm:table-cell">Batch</th>
-                      <th className="px-4 py-2 hidden md:table-cell">Expiry</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movements.map((m) => (
-                      <tr key={m.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {new Date(m.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}
-                        </td>
-                        <td className="px-4 py-2.5">{movementLabel(m.movementType)}</td>
-                        <td
-                          className={cn(
-                            'px-4 py-2.5 font-mono font-semibold',
-                            m.quantity < 0 ? 'text-red-700' : 'text-green-700',
-                          )}
-                        >
-                          {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
-                        </td>
-                        <td className="hidden px-4 py-2.5 text-xs sm:table-cell" style={{ color: 'var(--text-muted)' }}>
-                          {m.batchNumber ?? '—'}
-                        </td>
-                        <td className="hidden px-4 py-2.5 text-xs md:table-cell" style={{ color: 'var(--text-muted)' }}>
-                          {m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('en-GH') : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <MovementsTable movements={movements} movLoading={movLoading} movError={movError} />
         </>
       )}
 
       {item && (
         <ProductEditModal
           product={item}
+          unitPrice={item.unitPricePesewas ?? undefined}
+          nearestExpiry={item.nearestExpiry ?? undefined}
           open={editOpen}
           onClose={() => setEditOpen(false)}
         />
@@ -628,6 +609,127 @@ function Stat({
         {label}
       </p>
       <p className={cn('mt-1 font-mono text-lg font-bold', accent && 'text-[var(--color-teal)]', valueClass)}>{value}</p>
+    </div>
+  );
+}
+
+
+function MovementsTable({ movements, movLoading, movError }: { movements: MovementRow[]; movLoading: boolean; movError: any }) {
+  const [page, setPage] = useState(1);
+  const perPage = 10;
+  const totalPages = Math.ceil(movements.length / perPage);
+  const paginated = movements.slice((page - 1) * perPage, page * perPage);
+
+  return (
+    <div
+      className="mt-8 rounded-2xl border overflow-hidden"
+      style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
+    >
+      <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--surface-border)' }}>
+        <div className="flex items-center gap-2">
+          <Package size={16} className="text-[var(--color-teal)]" />
+          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            Stock Movements
+          </h2>
+        </div>
+        {movements.length > 0 && (
+          <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>
+            {movements.length} total
+          </span>
+        )}
+      </div>
+      {movError && (
+        <p className="px-4 py-3 text-sm text-red-700">Could not load movement history.</p>
+      )}
+      {movLoading && movements.length === 0 && (
+        <div className="space-y-2 p-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-10 rounded-lg" />
+          ))}
+        </div>
+      )}
+      {!movLoading && movements.length === 0 && !movError && (
+        <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+          No movements recorded yet for this SKU.
+        </p>
+      )}
+      {movements.length > 0 && (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-left text-xs font-semibold uppercase tracking-wide"
+                  style={{ background: 'var(--surface-base)', color: 'var(--text-muted)' }}
+                >
+                  <th className="px-4 py-2">When</th>
+                  <th className="px-4 py-2">Type</th>
+                  <th className="px-4 py-2">Qty</th>
+                  <th className="px-4 py-2 hidden sm:table-cell">Batch</th>
+                  <th className="px-4 py-2 hidden md:table-cell">Expiry</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((m) => (
+                  <tr key={m.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                    <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(m.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={cn(
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
+                        m.movementType === 'SALE' && 'bg-blue-50 text-blue-700',
+                        m.movementType === 'PURCHASE' && 'bg-green-50 text-green-700',
+                        m.movementType === 'ADJUSTMENT' && 'bg-amber-50 text-amber-700',
+                        m.movementType === 'TRANSFER_IN' && 'bg-teal-50 text-teal-700',
+                        m.movementType === 'TRANSFER_OUT' && 'bg-purple-50 text-purple-700',
+                        m.movementType === 'REFUND' && 'bg-red-50 text-red-700',
+                        m.movementType === 'EXPIRY_WRITE_OFF' && 'bg-red-50 text-red-700',
+                      )}>
+                        {movementLabel(m.movementType)}
+                      </span>
+                    </td>
+                    <td
+                      className={cn(
+                        'px-4 py-2.5 font-mono font-semibold',
+                        m.quantity < 0 ? 'text-red-700' : 'text-green-700',
+                      )}
+                    >
+                      {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                    </td>
+                    <td className="hidden px-4 py-2.5 text-xs sm:table-cell" style={{ color: 'var(--text-muted)' }}>
+                      {m.batchNumber ?? '\u2014'}
+                    </td>
+                    <td className="hidden px-4 py-2.5 text-xs md:table-cell" style={{ color: 'var(--text-muted)' }}>
+                      {m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('en-GH') : '\u2014'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                Page {page} of {totalPages} ({movements.length} movements)
+              </span>
+              <div className="flex gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-30"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                  Prev
+                </button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-30"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

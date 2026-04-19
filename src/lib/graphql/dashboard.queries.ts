@@ -10,6 +10,7 @@ export const LIST_STAFF = gql`
       branch_id
       is_active
       is_on_duty
+      last_seen_at
       position
       department
       employment_type
@@ -131,6 +132,22 @@ export const STAFF_SESSION_HISTORY = gql`
       ip_address
       user_agent
       is_open
+    }
+  }
+`;
+
+
+export const STAFF_ACTIVITY_LOG = gql`
+  query StaffActivityLog($userId: ID!, $limit: Int) {
+    staffActivityLog(userId: $userId, limit: $limit) {
+      id
+      type
+      operation
+      operationType
+      ipAddress
+      durationMs
+      error
+      createdAt
     }
   }
 `;

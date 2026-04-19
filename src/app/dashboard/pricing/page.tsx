@@ -2,20 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { DollarSign, History } from 'lucide-react';
-import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
+import {
+  DollarSign, History, TrendingUp, TrendingDown, Search, ArrowLeft,
+  AlertTriangle, CheckCircle, Percent, Tag, ArrowRight,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import type { Product } from '@/types';
 import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
-import {
-  LATEST_PRODUCT_COSTS,
-  PRODUCT_PRICE_HISTORY,
-} from '@/lib/graphql/pricing.queries';
-import {
-  BULK_UPDATE_PRODUCT_PRICES,
-  UPDATE_PRODUCT_PRICE,
-} from '@/lib/graphql/pricing.mutations';
-import { GhsMoney } from '@/components/ui/ghs-money';
+import { LATEST_PRODUCT_COSTS, PRODUCT_PRICE_HISTORY } from '@/lib/graphql/pricing.queries';
+import { UPDATE_PRODUCT_PRICE, BULK_UPDATE_PRODUCT_PRICES } from '@/lib/graphql/pricing.mutations';
 import { Pagination } from '@/components/ui/pagination';
 
 type PriceHistoryRow = {
@@ -35,450 +31,386 @@ type ProductCostSnapshot = {
   observedAt: string;
 };
 
-function toPesewas(ghs: number): number {
-  return Math.max(1, Math.round(ghs * 100));
-}
+function fmt(pesewas: number) { return 'GH\u20B5' + (pesewas / 100).toFixed(2); }
+function toPesewas(ghs: number) { return Math.max(1, Math.round(ghs * 100)); }
 
 export default function PricingPage() {
   const { user } = useAuthStore();
-  const [query, setQuery] = useState('');
-  const [defaultMarginPct, setDefaultMarginPct] = useState(25);
-  const [costByProduct, setCostByProduct] = useState<Record<string, string>>({});
-  const [marginByProduct, setMarginByProduct] = useState<Record<string, string>>({});
-  const [manualSellByProduct, setManualSellByProduct] = useState<Record<string, string>>(
-    {},
-  );
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
-  const canManagePricing = user
-    ? ['owner', 'se_admin', 'manager'].includes(user.role)
-    : false;
+  const canManage = user ? ['owner', 'se_admin', 'manager'].includes(user.role) : false;
   const branchId = user?.branch_id ?? '';
 
-  const {
-    data: searchData,
-    loading: searchLoading,
-    refetch: refetchProducts,
-  } = useQuery<{ searchProducts: Product[] }>(SEARCH_PRODUCTS_QUERY, {
-    variables: { query, branchId, limit: 50 },
-    skip: !canManagePricing || !branchId || query.trim().length < 2,
-    fetchPolicy: 'cache-and-network',
-  });
+  const [query, setQuery] = useState('');
+  const [defaultMargin, setDefaultMargin] = useState(25);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const perPage = 12;
 
-  const { data: historyData, loading: historyLoading } = useQuery<{
-    productPriceHistory: PriceHistoryRow[];
-  }>(PRODUCT_PRICE_HISTORY, {
-    variables: { productId: selectedProductId ?? '', limit: 12 },
-    skip: !selectedProductId,
-    fetchPolicy: 'network-only',
-  });
-
-  const [updateProductPrice, { loading: updatingOne }] = useMutation(
-    UPDATE_PRODUCT_PRICE,
-  );
-  const [bulkUpdateProductPrices, { loading: updatingBulk }] = useMutation(
-    BULK_UPDATE_PRODUCT_PRICES,
+  // Search products (show all with empty query by using a space)
+  const searchQuery = query.trim().length >= 2 ? query : 'a'; // Default search to show products
+  const { data: searchData, loading: searchLoading, refetch } = useQuery<{ searchProducts: Product[] }>(
+    SEARCH_PRODUCTS_QUERY,
+    { variables: { query: searchQuery, branchId, limit: 100 }, skip: !canManage || !branchId, fetchPolicy: 'cache-and-network' },
   );
 
   const products = searchData?.searchProducts ?? [];
-  const productIds = useMemo(() => products.map((p) => p.id), [products]);
-  const { data: latestCostData } = useQuery<{ latestProductCosts: ProductCostSnapshot[] }>(
+  const productIds = useMemo(() => products.map(p => p.id), [products]);
+
+  // Get latest supplier costs
+  const { data: costData } = useQuery<{ latestProductCosts: ProductCostSnapshot[] }>(
     LATEST_PRODUCT_COSTS,
-    {
-      variables: { productIds },
-      skip: !canManagePricing || productIds.length === 0,
-      fetchPolicy: 'cache-and-network',
-    },
+    { variables: { productIds }, skip: productIds.length === 0, fetchPolicy: 'cache-and-network' },
+  );
+  const costMap = useMemo(() => {
+    const m = new Map<string, ProductCostSnapshot>();
+    for (const c of costData?.latestProductCosts ?? []) m.set(c.productId, c);
+    return m;
+  }, [costData]);
+
+  // Price history for selected product
+  const { data: historyData, loading: historyLoading } = useQuery<{ productPriceHistory: PriceHistoryRow[] }>(
+    PRODUCT_PRICE_HISTORY,
+    { variables: { productId: selectedId ?? '', limit: 20 }, skip: !selectedId, fetchPolicy: 'network-only' },
   );
 
-  useEffect(() => {
-    const snapshots = latestCostData?.latestProductCosts ?? [];
-    if (snapshots.length === 0) return;
-    setCostByProduct((prev) => {
-      const next = { ...prev };
-      for (const snap of snapshots) {
-        if (next[snap.productId] == null || next[snap.productId] === '') {
-          next[snap.productId] = (snap.latestCostPesewas / 100).toFixed(2);
-        }
-      }
-      return next;
-    });
-  }, [latestCostData]);
+  const [updatePrice, { loading: updating }] = useMutation(UPDATE_PRODUCT_PRICE);
+  const [bulkUpdate, { loading: bulkUpdating }] = useMutation(BULK_UPDATE_PRODUCT_PRICES);
 
+  // Build rows with margin calculations
   const rows = useMemo(() => {
-    return products.map((p) => {
-      const costInput = costByProduct[p.id];
-      const marginInput = marginByProduct[p.id];
-      const marginPct =
-        marginInput === undefined || marginInput === ''
-          ? defaultMarginPct
-          : Number(marginInput);
-      const costGhs =
-        costInput === undefined || costInput === ''
-          ? null
-          : Number(costInput);
-
-      const currentSellGhs = p.unitPrice / 100;
-      const manualSellInput = manualSellByProduct[p.id];
-      const manualSellGhs =
-        manualSellInput === undefined || manualSellInput === ''
-          ? null
-          : Number(manualSellInput);
-      const suggestedSellGhs =
-        costGhs !== null && Number.isFinite(costGhs)
-          ? Math.max(0.01, Number((costGhs * (1 + marginPct / 100)).toFixed(2)))
-          : currentSellGhs;
+    return products.map(p => {
+      const cost = costMap.get(p.id);
+      const costPesewas = cost?.latestCostPesewas ?? 0;
+      const sellPesewas = p.unitPrice;
+      const marginPesewas = sellPesewas - costPesewas;
+      const marginPct = costPesewas > 0 ? (marginPesewas / costPesewas) * 100 : 0;
+      const suggestedSell = costPesewas > 0 ? Math.round(costPesewas * (1 + defaultMargin / 100)) : sellPesewas;
+      const priceDiff = suggestedSell - sellPesewas;
 
       return {
         product: p,
-        costGhs,
-        marginPct: Number.isFinite(marginPct) ? marginPct : defaultMarginPct,
-        currentSellGhs,
-        suggestedSellGhs,
-        manualSellGhs:
-          manualSellGhs !== null && Number.isFinite(manualSellGhs) && manualSellGhs > 0
-            ? manualSellGhs
-            : null,
+        costPesewas,
+        costFormatted: cost?.latestCostFormatted ?? '\u2014',
+        sellPesewas,
+        marginPesewas,
+        marginPct,
+        suggestedSell,
+        priceDiff,
+        hasCost: costPesewas > 0,
+        marginHealth: costPesewas > 0 ? (marginPct >= 20 ? 'good' : marginPct >= 10 ? 'low' : marginPct > 0 ? 'thin' : 'loss') : 'unknown',
       };
     });
-  }, [products, costByProduct, marginByProduct, manualSellByProduct, defaultMarginPct]);
+  }, [products, costMap, defaultMargin]);
 
-  const totalPages = Math.ceil(rows.length / itemsPerPage);
-  const paginatedRows = rows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Filter by search
+  const filtered = useMemo(() => {
+    if (query.trim().length < 2) return rows;
+    const q = query.toLowerCase();
+    return rows.filter(r =>
+      r.product.name.toLowerCase().includes(q) ||
+      r.product.supplier?.name?.toLowerCase().includes(q) ||
+      r.product.barcode?.toLowerCase().includes(q)
+    );
+  }, [rows, query]);
 
-  // Reset to page 1 when query changes
-  useMemo(() => {
-    setCurrentPage(1);
-  }, [query]);
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  async function applySinglePrice(row: (typeof rows)[number]): Promise<void> {
-    setError(null);
-    if (row.costGhs === null || !Number.isFinite(row.costGhs) || row.costGhs <= 0) {
-      setError(`Enter supplier cost for ${row.product.name} first.`);
-      return;
+  useEffect(() => { setPage(1); }, [query]);
+
+  // Stats
+  const stats = useMemo(() => {
+    let withCost = 0, belowMargin = 0, atLoss = 0;
+    for (const r of rows) {
+      if (r.hasCost) withCost++;
+      if (r.hasCost && r.marginPct < 20) belowMargin++;
+      if (r.hasCost && r.marginPct <= 0) atLoss++;
     }
+    return { total: rows.length, withCost, belowMargin, atLoss };
+  }, [rows]);
+
+  const handleSavePrice = async (productId: string) => {
+    setError(null); setSuccess(null);
+    const pp = Math.round(parseFloat(editPrice) * 100);
+    if (isNaN(pp) || pp <= 0) { setError('Enter a valid price'); return; }
     try {
-      await updateProductPrice({
-        variables: {
-          input: {
-            productId: row.product.id,
-            unitPriceGhsPesewas: toPesewas(row.suggestedSellGhs),
-            reason: `Cost-based margin pricing: cost GH¢${row.costGhs.toFixed(
-              2,
-            )}, margin ${row.marginPct.toFixed(1)}%`,
-          },
-        },
-      });
-      await refetchProducts();
-      setSelectedProductId(row.product.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update price.');
-    }
-  }
+      await updatePrice({ variables: { input: { productId, unitPriceGhsPesewas: pp, reason: editReason.trim() || 'Price update' } } });
+      setEditingId(null); setEditPrice(''); setEditReason('');
+      setSuccess('Price updated'); setSelectedId(productId);
+      setTimeout(() => setSuccess(null), 3000);
+      refetch();
+    } catch (e: any) { setError(e?.message || 'Failed to update price'); }
+  };
 
-  async function applyBulkPricing(): Promise<void> {
-    setError(null);
-    const updates = rows
-      .filter((r) => r.costGhs !== null && Number.isFinite(r.costGhs) && (r.costGhs ?? 0) > 0)
-      .map((r) => ({
-        productId: r.product.id,
-        unitPriceGhsPesewas: toPesewas(r.suggestedSellGhs),
-        reason: `Bulk cost-margin update: cost GH¢${(r.costGhs as number).toFixed(
-          2,
-        )}, margin ${r.marginPct.toFixed(1)}%`,
-      }));
-
-    if (updates.length === 0) {
-      setError('No products with supplier cost entered for bulk apply.');
-      return;
-    }
-
+  const handleBulkApply = async () => {
+    setError(null); setSuccess(null);
+    const updates = rows.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).map(r => ({
+      productId: r.product.id,
+      unitPriceGhsPesewas: r.suggestedSell,
+      reason: 'Bulk margin update: ' + defaultMargin + '% on cost ' + r.costFormatted,
+    }));
+    if (updates.length === 0) { setError('No products with cost data to update'); return; }
     try {
-      await bulkUpdateProductPrices({ variables: { input: { updates } } });
-      await refetchProducts();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bulk pricing update failed.');
-    }
-  }
+      await bulkUpdate({ variables: { input: { updates } } });
+      setSuccess(updates.length + ' prices updated'); refetch();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) { setError(e?.message || 'Bulk update failed'); }
+  };
 
-  async function applyManualPrice(row: (typeof rows)[number]): Promise<void> {
-    setError(null);
-    if (row.manualSellGhs === null) {
-      setError(`Enter a manual selling price for ${row.product.name}.`);
-      return;
-    }
-    try {
-      await updateProductPrice({
-        variables: {
-          input: {
-            productId: row.product.id,
-            unitPriceGhsPesewas: toPesewas(row.manualSellGhs),
-            reason: `Manager override price set to GH¢${row.manualSellGhs.toFixed(2)}`,
-          },
-        },
-      });
-      await refetchProducts();
-      setSelectedProductId(row.product.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not apply manual price.');
-    }
-  }
-
-  if (!canManagePricing) {
+  if (!canManage) {
     return (
       <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
-        <div
-          className="rounded-lg px-4 py-3 text-sm"
-          style={{ border: '1px solid rgba(220,38,38,0.2)', background: 'rgba(220,38,38,0.06)', color: '#b91c1c' }}
-        >
-          You do not have access to pricing controls.
+        <div className="rounded-lg px-4 py-3 text-sm" style={{ border: '1px solid rgba(220,38,38,0.2)', background: 'rgba(220,38,38,0.06)', color: '#b91c1c' }}>
+          Pricing control is restricted to managers and owners.
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Pricing Control</h1>
-        <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Auto-prefilled supplier costs from GRN, margin-based pricing, plus manual manager overrides per product.
-        </p>
+    <div style={{ background: 'var(--surface-base)', minHeight: '100vh' }}>
+      {/* Hero */}
+      <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(245,158,11,0.05) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
+        <div className="mx-auto max-w-[1440px] px-4 pt-5 pb-4 md:px-6">
+          <Link href="/dashboard" className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Dashboard</Link>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Pricing Control</h1>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Cost-based margin pricing, manual overrides, and price history</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)' }}>
+                <Percent size={12} style={{ color: 'var(--text-muted)' }} />
+                <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>Margin</span>
+                <input type="number" min={0} step={1} value={defaultMargin} onChange={e => setDefaultMargin(Number(e.target.value) || 0)}
+                  className="w-12 bg-transparent text-sm font-bold text-center outline-none" style={{ color: 'var(--text-primary)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>%</span>
+              </div>
+              <button onClick={handleBulkApply} disabled={bulkUpdating || updating}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}>
+                <DollarSign size={13} /> {bulkUpdating ? 'Applying...' : 'Bulk Apply Margin'}
+              </button>
+            </div>
+          </div>
+
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MiniKpi label="Products" value={String(stats.total)} color="#0d9488" />
+            <MiniKpi label="With Cost Data" value={String(stats.withCost)} color="#3b82f6" />
+            <MiniKpi label="Below 20% Margin" value={String(stats.belowMargin)} color={stats.belowMargin > 0 ? '#f59e0b' : '#16a34a'} />
+            <MiniKpi label="At Loss" value={String(stats.atLoss)} color={stats.atLoss > 0 ? '#dc2626' : '#16a34a'} />
+          </div>
+        </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_180px_200px]">
-        <SearchFieldWithClear
-          wrapperClassName="min-w-0"
-          value={query}
-          onValueChange={setQuery}
-          iconSize={15}
-          placeholder="Search product name, generic or barcode..."
-          className="w-full rounded-lg py-2 pr-10 text-sm outline-none"
-          style={{
-            background: 'var(--surface-card)',
-            border: '1px solid var(--surface-border)',
-            color: 'var(--text-primary)',
-          }}
-        />
-        <label className="rounded-lg px-3 py-2" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)' }}>
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Default margin %</p>
-          <input
-            type="number"
-            min={0}
-            step="0.5"
-            value={defaultMarginPct}
-            onChange={(e) => setDefaultMarginPct(Number(e.target.value || 0))}
-            className="mt-0.5 w-full bg-transparent text-sm font-semibold outline-none"
-            style={{ color: 'var(--text-primary)' }}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => void applyBulkPricing()}
-          disabled={updatingBulk || updatingOne}
-          className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          style={{ background: 'var(--color-teal)' }}
-        >
-          <DollarSign size={15} />
-          {updatingBulk ? 'Applying...' : 'Apply To Filtered'}
-        </button>
+      <div className="mx-auto max-w-[1440px] px-4 py-5 md:px-6">
+        {/* Messages */}
+        {error && <div className="mb-4 rounded-lg px-4 py-2.5 text-sm" style={{ background: 'rgba(220,38,38,0.07)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>{error}</div>}
+        {success && <div className="mb-4 rounded-lg px-4 py-2.5 text-sm" style={{ background: 'rgba(22,163,74,0.07)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }}><CheckCircle size={14} className="inline mr-1" />{success}</div>}
+
+        {/* Search */}
+        <div className="mb-4 flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search product, supplier, or barcode..."
+              className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm outline-none"
+              style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+          </div>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{filtered.length} products</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
+          {/* Product pricing table */}
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+            {/* Header */}
+            <div className="hidden lg:grid items-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.02)', gridTemplateColumns: '1fr 90px 90px 90px 70px 120px' }}>
+              <span>Product</span><span>Cost</span><span>Sell Price</span><span>Suggested</span><span>Margin</span><span className="text-right">Action</span>
+            </div>
+
+            {searchLoading && products.length === 0 && <div className="p-8 text-center"><div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-teal border-t-transparent" /></div>}
+
+            {paginated.map(row => {
+              const isEditing = editingId === row.product.id;
+              const mColor = row.marginHealth === 'good' ? '#16a34a' : row.marginHealth === 'low' ? '#f59e0b' : row.marginHealth === 'thin' ? '#dc2626' : row.marginHealth === 'loss' ? '#dc2626' : 'var(--text-muted)';
+
+              return (
+                <div key={row.product.id} className="border-b transition-colors hover:bg-[rgba(0,0,0,0.015)]" style={{ borderColor: 'var(--surface-border)' }}>
+                  <div className="lg:grid items-center gap-2 px-4 py-3" style={{ gridTemplateColumns: '1fr 90px 90px 90px 70px 120px' }}>
+                    {/* Product */}
+                    <button onClick={() => setSelectedId(row.product.id)} className="text-left min-w-0">
+                      <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>{row.product.name}</p>
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{row.product.supplier?.name || 'No supplier'}</p>
+                    </button>
+                    {/* Cost */}
+                    <span className="text-xs font-mono" style={{ color: row.hasCost ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{row.hasCost ? row.costFormatted : '\u2014'}</span>
+                    {/* Sell Price */}
+                    <span className="text-xs font-mono font-bold" style={{ color: '#0d9488' }}>{fmt(row.sellPesewas)}</span>
+                    {/* Suggested */}
+                    <span className="text-xs font-mono" style={{ color: row.hasCost && row.priceDiff !== 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                      {row.hasCost ? fmt(row.suggestedSell) : '\u2014'}
+                    </span>
+                    {/* Margin */}
+                    <span className="text-[11px] font-bold" style={{ color: mColor }}>
+                      {row.hasCost ? row.marginPct.toFixed(0) + '%' : '\u2014'}
+                    </span>
+                    {/* Action */}
+                    <div className="flex justify-end">
+                      <button onClick={() => { setEditingId(row.product.id); setEditPrice((row.sellPesewas / 100).toFixed(2)); setEditReason(''); }}
+                        className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all hover:scale-[1.02]"
+                        style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.15)' }}>
+                        Edit Price
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Inline edit form */}
+                  {isEditing && (
+                    <div className="px-4 pb-3 flex items-end gap-3" style={{ background: 'rgba(13,148,136,0.03)' }}>
+                      <div className="flex-1 max-w-[140px]">
+                        <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>New Price (GHS)</label>
+                        <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                          className="w-full rounded-lg border px-2.5 py-1.5 text-sm font-mono font-bold"
+                          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>Reason</label>
+                        <input value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="e.g. Supplier price increase"
+                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs"
+                          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+                      </div>
+                      <button onClick={() => handleSavePrice(row.product.id)} disabled={updating}
+                        className="rounded-lg px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50" style={{ background: '#0d9488' }}>
+                        {updating ? 'Saving...' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingId(null)} className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {filtered.length === 0 && !searchLoading && (
+              <div className="p-12 text-center">
+                <Tag className="mx-auto mb-3 h-8 w-8 opacity-20" />
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No products found</p>
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                    className="rounded px-2.5 py-1 text-[11px] font-semibold disabled:opacity-30" style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>Prev</button>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                    className="rounded px-2.5 py-1 text-[11px] font-semibold disabled:opacity-30" style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Price History Sidebar */}
+          <PriceHistorySidebar selectedId={selectedId} historyData={historyData?.productPriceHistory ?? []} historyLoading={historyLoading} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniKpi({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="rounded-2xl p-3" style={{ background: color + '08', border: '1px solid ' + color + '18' }}>
+      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <p className="text-xl font-bold font-mono mt-0.5" style={{ color }}>{value}</p>
+    </div>
+  );
+}
+
+function PriceHistorySidebar({ selectedId, historyData, historyLoading }: {
+  selectedId: string | null; historyData: PriceHistoryRow[]; historyLoading: boolean;
+}) {
+  const [hPage, setHPage] = useState(1);
+  const hPerPage = 5;
+
+  // Reset page when product changes
+  useEffect(() => { setHPage(1); }, [selectedId]);
+
+  const totalHPages = Math.ceil(historyData.length / hPerPage);
+  const paginatedHistory = historyData.slice((hPage - 1) * hPerPage, hPage * hPerPage);
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+        <div className="flex items-center gap-2">
+          <History size={14} style={{ color: '#0d9488' }} />
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Price History</h3>
+        </div>
+        {selectedId && historyData.length > 0 && (
+          <span className="text-[9px] font-bold" style={{ color: 'var(--text-muted)' }}>{historyData.length} changes</span>
+        )}
       </div>
 
-      {error && (
-        <div
-          className="mb-4 rounded-lg px-4 py-2.5 text-sm"
-          style={{ background: 'rgba(220,38,38,0.07)', color: '#b91c1c', border: '1px solid rgba(220,38,38,0.2)' }}
-        >
-          {error}
+      {!selectedId && (
+        <div className="p-6 text-center">
+          <History className="mx-auto mb-2 h-8 w-8 opacity-15" />
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Click a product to view price changes</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-        <div
-          className="overflow-x-auto rounded-xl"
-          style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
-        >
-          <table className="w-full text-sm min-w-[800px]">
-            <thead>
-              <tr
-                className="text-left text-xs font-medium uppercase tracking-wide"
-                style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)', color: 'var(--text-muted)' }}
-              >
-                <th className="px-3 py-3">Product</th>
-                <th className="px-3 py-3">Current</th>
-                <th className="px-3 py-3">Supplier cost</th>
-                <th className="px-3 py-3">Margin %</th>
-                <th className="px-3 py-3">Suggested</th>
-                <th className="px-3 py-3">Manual sell</th>
-                <th className="px-3 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRows.map((row) => (
-                <tr key={row.product.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <td className="px-3 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProductId(row.product.id)}
-                      className="text-left"
-                    >
-                      <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{row.product.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {row.product.supplier?.name ?? 'No supplier linked'}
-                      </p>
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <GhsMoney amount={row.currentSellGhs} className="font-mono text-sm" />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={costByProduct[row.product.id] ?? ''}
-                      onChange={(e) =>
-                        setCostByProduct((prev) => ({ ...prev, [row.product.id]: e.target.value }))
-                      }
-                      className="w-[110px] rounded-md px-2 py-1 text-xs outline-none"
-                      style={{ border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}
-                      placeholder="Auto from GRN"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.5"
-                      value={marginByProduct[row.product.id] ?? ''}
-                      onChange={(e) =>
-                        setMarginByProduct((prev) => ({ ...prev, [row.product.id]: e.target.value }))
-                      }
-                      className="w-[90px] rounded-md px-2 py-1 text-xs outline-none"
-                      style={{ border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}
-                      placeholder={String(defaultMarginPct)}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <GhsMoney amount={row.suggestedSellGhs} className="font-mono text-sm font-semibold" />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={manualSellByProduct[row.product.id] ?? ''}
-                      onChange={(e) =>
-                        setManualSellByProduct((prev) => ({ ...prev, [row.product.id]: e.target.value }))
-                      }
-                      className="w-[110px] rounded-md px-2 py-1 text-xs outline-none"
-                      style={{ border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}
-                      placeholder="Optional"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => void applySinglePrice(row)}
-                        disabled={updatingOne || updatingBulk}
-                        className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                        style={{ background: 'var(--color-teal)' }}
-                      >
-                        Apply margin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void applyManualPrice(row)}
-                        disabled={updatingOne || updatingBulk}
-                        className="rounded-md px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60"
-                        style={{
-                          border: '1px solid var(--surface-border)',
-                          color: 'var(--text-secondary)',
-                          background: 'var(--surface-base)',
-                        }}
-                      >
-                        Manual set
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {query.trim().length < 2 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Type at least 2 characters to manage product pricing.
-                  </td>
-                </tr>
-              )}
-              {query.trim().length >= 2 && !searchLoading && paginatedRows.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    No products found for this search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          
-          {rows.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalItems={rows.length}
-              itemsPerPage={itemsPerPage}
-            />
-          )}
-        </div>
+      {selectedId && historyLoading && (
+        <div className="p-6 text-center"><div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-teal border-t-transparent" /></div>
+      )}
 
-        <div
-          className="rounded-xl p-4"
-          style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <History size={15} style={{ color: 'var(--text-secondary)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Price history</h2>
-          </div>
-          {!selectedProductId && (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Select a product to view recent pricing actions.
-            </p>
-          )}
-          {selectedProductId && historyLoading && (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading history...</p>
-          )}
-          {selectedProductId && !historyLoading && (
-            <div className="space-y-2">
-              {(historyData?.productPriceHistory ?? []).map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-lg p-3"
-                  style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}
-                >
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {new Date(entry.changedAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}
-                  </p>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    <span className="font-mono">GH¢{(entry.oldPriceGhsPesewas / 100).toFixed(2)}</span>
-                    {' '}→{' '}
-                    <span className="font-mono">GH¢{(entry.newPriceGhsPesewas / 100).toFixed(2)}</span>
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {entry.reason || 'No reason recorded'} · by {entry.changedByName}
-                  </p>
+      {selectedId && !historyLoading && (
+        <>
+          <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
+            {paginatedHistory.map((entry, idx) => (
+              <div key={entry.id + '-' + ((hPage - 1) * hPerPage + idx)} className="px-4 py-2.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {entry.newPriceGhsPesewas > entry.oldPriceGhsPesewas
+                    ? <TrendingUp size={11} style={{ color: '#dc2626' }} />
+                    : <TrendingDown size={11} style={{ color: '#16a34a' }} />
+                  }
+                  <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{fmt(entry.oldPriceGhsPesewas)}</span>
+                  <ArrowRight size={10} style={{ color: 'var(--text-muted)' }} />
+                  <span className="text-xs font-mono font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(entry.newPriceGhsPesewas)}</span>
                 </div>
-              ))}
-              {(historyData?.productPriceHistory ?? []).length === 0 && (
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No history for this product yet.</p>
-              )}
+                <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                  {entry.reason || 'No reason'} &bull; {entry.changedByName}
+                </p>
+                <p className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  {new Date(entry.changedAt).toLocaleDateString('en-GH', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            ))}
+            {historyData.length === 0 && (
+              <p className="px-4 py-6 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No price changes recorded</p>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalHPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+              <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{hPage}/{totalHPages}</span>
+              <div className="flex gap-1">
+                <button onClick={() => setHPage(p => Math.max(1, p - 1))} disabled={hPage === 1}
+                  className="rounded px-2 py-0.5 text-[10px] font-semibold disabled:opacity-30"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>Prev</button>
+                <button onClick={() => setHPage(p => Math.min(totalHPages, p + 1))} disabled={hPage === totalHPages}
+                  className="rounded px-2 py-0.5 text-[10px] font-semibold disabled:opacity-30"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>Next</button>
+              </div>
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

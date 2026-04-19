@@ -5,6 +5,8 @@ import './globals.css';
 import { ApolloProvider } from '@/lib/apollo/apollo-provider';
 import { LenisProvider } from '@/lib/lenis/lenis-provider';
 import { ThemeSync } from '@/components/theme-sync';
+import { ZoomSync } from '@/components/zoom-sync';
+import { ZoomWrapper } from '@/components/zoom-wrapper';
 
 const THEME_INIT = `(function(){
   try {
@@ -16,28 +18,48 @@ const THEME_INIT = `(function(){
     }
     var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', dark);
+    var zRaw = localStorage.getItem('pharmapos-zoom');
+    if (zRaw) {
+      var z = JSON.parse(zRaw);
+      if (z && z.state && z.state.zoom && z.state.zoom !== '100') {
+        document.documentElement.style.zoom = String(parseInt(z.state.zoom) / 100);
+      }
+    }
   } catch (e) {}
 })();`;
 
+// Optimize font loading with display: swap and preload
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true,
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains-mono',
   display: 'swap',
+  preload: true,
+  fallback: ['Courier New', 'monospace'],
+  adjustFontFallback: true,
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: 'PharmaPOS Pro',
-  description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana',
-  keywords: ['PharmaPOS', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting'],
+  title: {
+    default: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    template: '%s | PharmaPOS Pro',
+  },
+  description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana. Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
+  keywords: ['PharmaPOS', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting', 'FDA compliance', 'offline POS'],
+  authors: [{ name: 'Advansis Technologies' }],
+  creator: 'Advansis Technologies',
+  publisher: 'Advansis Technologies',
   alternates: {
     canonical: '/',
   },
@@ -64,15 +86,15 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_GH',
     siteName: 'PharmaPOS Pro',
-    title: 'PharmaPOS Pro',
-    description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana',
+    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     url: '/',
     images: [{ url: '/icon.png', width: 512, height: 512, alt: 'PharmaPOS logo' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PharmaPOS Pro',
-    description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana',
+    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     images: ['/icon.png'],
   },
   appleWebApp: {
@@ -80,14 +102,25 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'PharmaPOS',
   },
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+  },
+  category: 'business',
 };
 
 export const viewport: Viewport = {
-  themeColor: '#006D77',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#006D77' },
+    { media: '(prefers-color-scheme: dark)', color: '#004D55' },
+  ],
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5, // Allow zoom for accessibility
+  userScalable: true, // Allow zoom for accessibility
+  viewportFit: 'cover',
 };
 
 // React 19: children is a plain prop, not wrapped in FC<{children}>
@@ -95,15 +128,32 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
-      <body>
+    <html 
+      lang="en" 
+      className={`${inter.variable} ${jetbrainsMono.variable}`} 
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Preconnect to API for faster requests */}
+        <link rel="preconnect" href={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'} />
+        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'} />
+        
+        {/* Preload critical resources */}
+        <link rel="preload" href="/manifest.json" as="fetch" crossOrigin="anonymous" />
+      </head>
+      <body suppressHydrationWarning>
+        {/* Inline critical theme script to prevent flash */}
         <Script id="pharmapos-theme-init" strategy="beforeInteractive">
           {THEME_INIT}
         </Script>
+        
         <ApolloProvider>
           <ThemeSync />
+          <ZoomSync />
           <LenisProvider>
-            {children}
+            <ZoomWrapper>
+              {children}
+            </ZoomWrapper>
           </LenisProvider>
         </ApolloProvider>
       </body>

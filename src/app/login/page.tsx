@@ -375,6 +375,8 @@ export default function LoginPage() {
           email: loggedIn.email ?? undefined,
           role,
           branch_id: loggedIn.branch_id,
+          branchName: (loggedIn as any).branch_name ?? undefined,
+          branchType: (loggedIn as any).branch_type ?? undefined,
         };
         setAuth(user, access_token, refresh_token);
         router.replace(postLoginPathForRole(role));

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import {
   ArrowLeft,
   Building2,
@@ -14,13 +14,16 @@ import {
   Truck,
   ClipboardList,
   Printer,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { SALE_DETAIL } from '@/lib/graphql/sales.queries';
+import { SALE_DETAIL, REFUND_SALE, REQUEST_REFUND } from '@/lib/graphql/sales.queries';
 import { GhsMoney } from '@/components/ui/ghs-money';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { isBranchWideSalesRole } from '@/lib/auth/sales-visibility';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
+import { SmartTextarea } from '@/components/ui/smart-textarea';
 import type { CartItem } from '@/types';
 
 type SaleDetail = {
@@ -80,6 +83,24 @@ export default function SaleDetailPage() {
   const { user } = useAuthStore();
   const shouldReduceMotion = useReducedMotion();
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showRefund, setShowRefund] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundError, setRefundError] = useState<string | null>(null);
+
+  const canRefund = user && ['owner', 'se_admin', 'manager'].includes(user.role);
+  const canRequestRefund = user && !canRefund; // cashiers, pharmacists, technicians
+
+  const [refundSale, { loading: refunding }] = useMutation(REFUND_SALE, {
+    onCompleted: () => { setShowRefund(false); setRefundReason(''); window.location.reload(); },
+    onError: (err) => setRefundError(err.message),
+  });
+
+  const [requestRefund, { loading: requesting }] = useMutation(REQUEST_REFUND, {
+    onCompleted: () => { setShowRefund(false); setRefundReason(''); setRefundError(null);
+      alert('Refund request submitted! Your manager will review it.');
+    },
+    onError: (err) => setRefundError(err.message),
+  });
 
   const { data, loading, error } = useQuery<{ sale: SaleDetail }>(SALE_DETAIL, {
     variables: { id: saleId },
@@ -146,19 +167,104 @@ export default function SaleDetailPage() {
                 {sale.id}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowReceipt(true)}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)]"
-              style={{
-                color: 'var(--text-primary)',
-                borderColor: 'var(--action-outline-neutral)',
-              }}
-            >
-              <Printer size={14} aria-hidden />
-              Print receipt
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Refund/Request button — role-based */}
+              {(canRefund || canRequestRefund) && sale.status === 'COMPLETED' && !showRefund && (
+                <button
+                  type="button"
+                  onClick={() => { setShowRefund(true); setRefundError(null); }}
+                  className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-red-50"
+                  style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                >
+                  <RotateCcw size={14} aria-hidden />
+                  {canRefund ? 'Refund Sale' : 'Request Refund'}
+                </button>
+              )}
+              {sale.status === 'REFUNDED' && (
+                <span className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold"
+                  style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
+                  <RotateCcw size={14} /> REFUNDED
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowReceipt(true)}
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)]"
+                style={{ color: 'var(--text-primary)', borderColor: 'var(--action-outline-neutral)' }}
+              >
+                <Printer size={14} aria-hidden />
+                Print receipt
+              </button>
+            </div>
           </header>
+
+          {/* Refund confirmation panel */}
+          {showRefund && (
+            <div className="mb-6 rounded-xl border-2 p-5" style={{ borderColor: 'rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.04)' }}>
+              <div className="flex items-start gap-3 mb-4">
+                <AlertTriangle size={20} className="shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: '#dc2626' }}>
+                    {canRefund ? 'Refund this sale?' : 'Request refund for this sale?'}
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {canRefund
+                      ? `This will reverse the sale, return ${sale.items.length} item(s) to inventory, and mark the sale as REFUNDED.`
+                      : `Your manager will review this request. The sale has ${sale.items.length} item(s) totaling ${sale.totalFormatted}.`
+                    }
+                  </p>
+                </div>
+              </div>
+              {refundError && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{refundError}</div>
+              )}
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>
+                  Reason for {canRefund ? 'refund' : 'return'} *
+                </label>
+                <SmartTextarea
+                  value={refundReason}
+                  onChange={setRefundReason}
+                  context="refund:reason"
+                  placeholder="e.g. Customer returned product — wrong medication dispensed"
+                  rows={2}
+                  className="w-full rounded-lg border border-surface-border px-3 py-2.5 text-sm bg-[var(--surface-base)] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+                <p className="mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  Minimum 5 characters. This will be recorded in the audit log.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {canRefund ? (
+                  <button
+                    type="button"
+                    disabled={refunding || refundReason.trim().length < 5}
+                    onClick={() => refundSale({ variables: { saleId: sale.id, reason: refundReason.trim() } })}
+                    className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {refunding ? 'Processing refund…' : 'Confirm Refund'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={requesting || refundReason.trim().length < 5}
+                    onClick={() => requestRefund({ variables: { saleId: sale.id, reason: refundReason.trim() } })}
+                    className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {requesting ? 'Submitting…' : 'Submit Refund Request'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setShowRefund(false); setRefundError(null); }}
+                  className="rounded-xl border px-4 py-2.5 text-sm font-medium"
+                  style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <div
             className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"

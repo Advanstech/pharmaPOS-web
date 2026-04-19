@@ -67,9 +67,11 @@ function normalizeItem(raw: { title?: string; url?: string; category?: string })
 interface PharmaMarketPulseProps {
   /** `compact` = single-band ticker for executive command center (less vertical scroll). */
   layout?: 'feature' | 'compact';
+  /** Optional initial article title to highlight on mount */
+  initialArticle?: string | null;
 }
 
-export function PharmaMarketPulse({ layout = 'feature' }: PharmaMarketPulseProps) {
+export function PharmaMarketPulse({ layout = 'feature', initialArticle }: PharmaMarketPulseProps) {
   const prefersReduced = useReducedMotion();
   const [items, setItems] = useState<PharmaNewsItem[]>(LOCAL_FALLBACK);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -89,9 +91,31 @@ export function PharmaMarketPulse({ layout = 'feature' }: PharmaMarketPulseProps
         if (next.length > 0) {
           setItems(next);
           setUpdatedAt(data.updatedAt ?? null);
+          // If initialArticle is provided, find and highlight the matching article
+          if (initialArticle) {
+            const matchIndex = next.findIndex(
+              (item) => item.title.toLowerCase() === decodeURIComponent(initialArticle).toLowerCase()
+            );
+            if (matchIndex !== -1) {
+              setSpotlight(matchIndex);
+              setPauseRotate(true);
+            }
+          }
         }
       } catch {
-        if (!cancelled) setItems(LOCAL_FALLBACK);
+        if (!cancelled) {
+          setItems(LOCAL_FALLBACK);
+          // Also check fallback for initialArticle
+          if (initialArticle) {
+            const matchIndex = LOCAL_FALLBACK.findIndex(
+              (item) => item.title.toLowerCase() === decodeURIComponent(initialArticle).toLowerCase()
+            );
+            if (matchIndex !== -1) {
+              setSpotlight(matchIndex);
+              setPauseRotate(true);
+            }
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -99,7 +123,7 @@ export function PharmaMarketPulse({ layout = 'feature' }: PharmaMarketPulseProps
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialArticle]);
 
   useEffect(() => {
     if (prefersReduced || items.length <= 1 || pauseRotate) return;

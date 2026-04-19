@@ -21,7 +21,7 @@ export function inventoryProductHref(productId: string): string {
 
 export function suppliersPageHref(supplierId?: string | null): string {
   if (supplierId) {
-    return `/dashboard/suppliers?supplierId=${encodeURIComponent(supplierId)}`;
+    return `/dashboard/suppliers/${encodeURIComponent(supplierId)}/products`;
   }
   return '/dashboard/suppliers';
 }

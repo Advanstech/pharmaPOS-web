@@ -12,6 +12,8 @@ export const INVENTORY_LIST_QUERY = gql`
       nearestExpiry
       supplierId
       supplierName
+      unitPricePesewas
+      unitPriceFormatted
     }
   }
 `;

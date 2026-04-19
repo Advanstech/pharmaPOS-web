@@ -12,6 +12,8 @@ export const LOGIN_MUTATION = gql`
         email
         role
         branch_id
+        branch_name
+        branch_type
       }
     }
   }

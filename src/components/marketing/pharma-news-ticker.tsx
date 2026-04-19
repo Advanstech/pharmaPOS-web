@@ -15,18 +15,19 @@ interface ApiResponse {
   items: NewsItem[];
 }
 
-function buildTickerSegments(items: NewsItem[]): string[] {
-  const clean = items.map((i) => stripHtmlNewsTitle(i.title).replace(/\s+/g, ' ').trim()).filter(Boolean);
-  if (clean.length === 0) return PHARMA_NEWS_FALLBACK.map((i) => i.title);
+function buildTickerSegments(items: NewsItem[]): NewsItem[] {
+  const clean = items
+    .map((i) => ({ title: stripHtmlNewsTitle(i.title).replace(/\s+/g, ' ').trim(), url: i.url }))
+    .filter((i) => i.title);
+  if (clean.length === 0) return PHARMA_NEWS_FALLBACK;
   return clean;
 }
 
 export function PharmaNewsTicker() {
   const prefersReducedMotion = useReducedMotion();
   const { user } = useAuthStore();
-  const [segments, setSegments] = useState<string[]>(() => PHARMA_NEWS_FALLBACK.map((i) => i.title));
+  const [segments, setSegments] = useState<NewsItem[]>(() => PHARMA_NEWS_FALLBACK);
   const [mounted, setMounted] = useState(false);
-  const marketPulseHref = user ? '/dashboard/market-intelligence' : '/login';
 
   useEffect(() => {
     setMounted(true);
@@ -71,15 +72,15 @@ export function PharmaNewsTicker() {
             reducedMotion={!!prefersReducedMotion}
             pauseOnHover
             className="min-w-0"
-            renderItem={(text) => (
+            renderItem={(item) => (
               <Link
-                href={marketPulseHref}
+                href={user ? `/dashboard/market-intelligence?article=${encodeURIComponent(item.title)}` : '/login'}
                 className="text-[11px] sm:text-xs font-medium pr-1 hover:underline"
                 style={{ color: 'var(--text-secondary)' }}
-                aria-label="Open market intelligence (login required)"
-                title="Open market intelligence"
+                aria-label={`Read: ${item.title} (login required)`}
+                title={`Read: ${item.title}`}
               >
-                {text}
+                {item.title}
               </Link>
             )}
             separator={
@@ -91,13 +92,13 @@ export function PharmaNewsTicker() {
         </div>
       ) : (
         <Link
-          href={marketPulseHref}
+          href={user ? `/dashboard/market-intelligence?article=${encodeURIComponent(segments[0]?.title || '')}` : '/login'}
           className="min-w-0 flex-1 text-[11px] sm:text-xs font-medium leading-snug line-clamp-2 hover:underline"
           style={{ color: 'var(--text-secondary)' }}
           aria-label="Open market intelligence (login required)"
           title="Open market intelligence"
         >
-          {segments[0] ?? PHARMA_NEWS_FALLBACK[0].title}
+          {segments[0]?.title ?? PHARMA_NEWS_FALLBACK[0].title}
         </Link>
       )}
 

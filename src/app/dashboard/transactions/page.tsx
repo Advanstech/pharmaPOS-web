@@ -514,145 +514,115 @@ export default function TransactionsPage() {
         style={{
           background: 'var(--surface-card)',
           border: '1px solid var(--surface-border)',
-          boxShadow: 'var(--shadow-card)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.04)',
         }}
       >
-        <div className="mb-4 flex items-center gap-2">
-          <Filter size={16} className="text-teal" aria-hidden />
-          <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>
-            Filters
-          </h2>
-          <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            (Accra dates · applies to loaded sales)
-          </span>
+        {/* Filter header with active count + clear */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg p-1.5" style={{ background: 'rgba(13,148,136,0.1)' }}>
+              <Filter size={14} style={{ color: '#0d9488' }} />
+            </div>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Filters</h2>
+            {hasStructuredFilters && (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
+                Active
+              </span>
+            )}
+          </div>
+          {hasStructuredFilters && (
+            <button type="button" onClick={() => {
+              setDateFrom(''); setDateTo(''); setClassificationFilter('');
+              setStockFilter(''); setSupplierFilter(''); setCashierFilter(''); setBranchFilter('');
+            }} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors hover:bg-red-50"
+              style={{ color: '#dc2626' }}>
+              <X size={12} /> Clear all
+            </button>
+          )}
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+
+        {/* Row 1: Date range + Product type — most used filters */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label htmlFor="tx-date-from" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-              From date
-            </label>
-            <input
-              id="tx-date-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-h-[42px] rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-              style={inputStyle}
-            />
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>From</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle} />
           </div>
           <div>
-            <label htmlFor="tx-date-to" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-              To date
-            </label>
-            <input
-              id="tx-date-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-h-[42px] rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-              style={inputStyle}
-            />
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>To</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle} />
           </div>
           <div>
-            <label htmlFor="tx-classification" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-              Product types
-            </label>
-            <select
-              id="tx-classification"
-              value={classificationFilter}
-              onChange={(e) => setClassificationFilter(e.target.value)}
-              className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-              style={inputStyle}
-            >
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Type</label>
+            <select value={classificationFilter} onChange={e => setClassificationFilter(e.target.value)}
+              className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle}>
               <option value="">All types</option>
-              <option value="rx_any">Has Rx (POM or controlled)</option>
-              <option value="otc_only">OTC only (all lines)</option>
+              <option value="rx_any">Has Rx (POM/Controlled)</option>
+              <option value="otc_only">OTC only</option>
               <option value="has_pom">Has POM</option>
-              <option value="has_controlled">Has controlled</option>
+              <option value="has_controlled">Has Controlled</option>
             </select>
           </div>
           <div>
-            <label htmlFor="tx-stock" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-              Worst stock in sale
-            </label>
-            <select
-              id="tx-stock"
-              value={stockFilter}
-              onChange={(e) => setStockFilter(e.target.value)}
-              className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-              style={inputStyle}
-            >
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Stock Level</label>
+            <select value={stockFilter} onChange={e => setStockFilter(e.target.value)}
+              className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle}>
               <option value="">All levels</option>
-              <option value="ok">OK</option>
-              <option value="low">Low</option>
-              <option value="critical">Critical</option>
-              <option value="out">Out</option>
+              <option value="ok">✅ OK</option>
+              <option value="low">⚠️ Low</option>
+              <option value="critical">🔴 Critical</option>
+              <option value="out">❌ Out</option>
             </select>
           </div>
-          {filterOptions.suppliers.length > 0 ? (
-            <div>
-              <label htmlFor="tx-supplier" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-                Supplier
-              </label>
-              <select
-                id="tx-supplier"
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-                style={inputStyle}
-              >
-                <option value="">All suppliers</option>
-                {filterOptions.suppliers.map((s) => (
-                  <option key={s} value={s}>
-                    {s.length > 48 ? `${s.slice(0, 46)}…` : s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-          {branchWideSales && filterOptions.branches.length > 1 ? (
-            <div>
-              <label htmlFor="tx-branch" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-                Branch
-              </label>
-              <select
-                id="tx-branch"
-                value={branchFilter}
-                onChange={(e) => setBranchFilter(e.target.value)}
-                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-                style={inputStyle}
-              >
-                <option value="">All branches</option>
-                {filterOptions.branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-          {branchWideSales && filterOptions.cashiers.length > 0 ? (
-            <div>
-              <label htmlFor="tx-cashier" className="mb-1 block text-xs font-semibold" style={labelStyle}>
-                Cashier
-              </label>
-              <select
-                id="tx-cashier"
-                value={cashierFilter}
-                onChange={(e) => setCashierFilter(e.target.value)}
-                className="w-full min-h-[42px] cursor-pointer rounded-xl px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-teal/30"
-                style={inputStyle}
-              >
-                <option value="">All cashiers</option>
-                {filterOptions.cashiers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
         </div>
+
+        {/* Row 2: Supplier + Branch + Cashier — contextual filters */}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {filterOptions.suppliers.length > 0 && (
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Supplier</label>
+              <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}
+                className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle}>
+                <option value="">All suppliers</option>
+                {filterOptions.suppliers.map(s => <option key={s} value={s}>{s.length > 40 ? s.slice(0, 38) + '…' : s}</option>)}
+              </select>
+            </div>
+          )}
+          {branchWideSales && filterOptions.branches.length > 1 && (
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Branch</label>
+              <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle}>
+                <option value="">All branches</option>
+                {filterOptions.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
+          {branchWideSales && filterOptions.cashiers.length > 0 && (
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Cashier</label>
+              <select value={cashierFilter} onChange={e => setCashierFilter(e.target.value)}
+                className="w-full cursor-pointer rounded-xl px-3 py-2.5 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/30" style={inputStyle}>
+                <option value="">All cashiers</option>
+                {filterOptions.cashiers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Active filter summary */}
+        {hasStructuredFilters && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {dateFrom && <FilterChip label={`From: ${dateFrom}`} onClear={() => setDateFrom('')} />}
+            {dateTo && <FilterChip label={`To: ${dateTo}`} onClear={() => setDateTo('')} />}
+            {classificationFilter && <FilterChip label={`Type: ${classificationFilter.replace('_', ' ')}`} onClear={() => setClassificationFilter('')} />}
+            {stockFilter && <FilterChip label={`Stock: ${stockFilter}`} onClear={() => setStockFilter('')} />}
+            {supplierFilter && <FilterChip label={`Supplier: ${supplierFilter.slice(0, 20)}`} onClear={() => setSupplierFilter('')} />}
+            {cashierFilter && <FilterChip label="Cashier" onClear={() => setCashierFilter('')} />}
+            {branchFilter && <FilterChip label="Branch" onClear={() => setBranchFilter('')} />}
+          </div>
+        )}
       </div>
       {receiptError && (
         <div
@@ -848,5 +818,18 @@ export default function TransactionsPage() {
         pendingSync={false}
       />
     </div>
+  );
+}
+
+
+function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all"
+      style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.15)' }}>
+      {label}
+      <button type="button" onClick={onClear} className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-teal/20">
+        <X size={10} />
+      </button>
+    </span>
   );
 }

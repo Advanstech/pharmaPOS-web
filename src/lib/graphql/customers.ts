@@ -8,6 +8,9 @@ export const LIST_CUSTOMERS = gql`
       customerCode
       name
       hasPhone
+      email
+      hasEmail
+      receiptPreference
       sex
       ageYears
       hasGhanaCard
@@ -36,6 +39,7 @@ export const CREATE_CUSTOMER = gql`
       id
       customerCode
       name
+      email
       hasPhone
       sex
       ageYears
@@ -56,6 +60,28 @@ export const UPDATE_CUSTOMER = gql`
       ageYears
       hasGhanaCard
       createdAt
+    }
+  }
+`;
+
+
+export const CUSTOMER_SALES = gql`
+  query CustomerSales($customerId: ID!, $limit: Int) {
+    customerSales(customerId: $customerId, limit: $limit) {
+      id
+      totalAmountPesewas
+      totalFormatted
+      vatAmountPesewas
+      status
+      cashierName
+      itemCount
+      createdAt
+      items {
+        productName
+        quantity
+        unitPricePesewas
+        classification
+      }
     }
   }
 `;

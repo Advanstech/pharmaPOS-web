@@ -1,10 +1,23 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { PharmaMarketPulse } from '@/components/dashboard/pharma-market-pulse';
 
 export default function MarketIntelligencePage() {
+  const searchParams = useSearchParams();
+  const articleTitle = searchParams.get('article');
+
+  useEffect(() => {
+    if (articleTitle) {
+      // Scroll to the article section when an article is specified
+      // The PharmaMarketPulse component will handle highlighting the specific article
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [articleTitle]);
+
   return (
     <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -24,7 +37,7 @@ export default function MarketIntelligencePage() {
         </div>
       </div>
 
-      <PharmaMarketPulse layout="feature" />
+      <PharmaMarketPulse layout="feature" initialArticle={articleTitle} />
     </div>
   );
 }

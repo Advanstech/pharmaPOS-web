@@ -140,8 +140,10 @@ export function HorizontalSwipableTicker<T>({
     };
 
     rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [reducedMotion, items.length, speed, pauseAuto, hoverPause, pauseOnHover]);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [reducedMotion, items.length, speed, pauseAuto, pauseOnHover]);
 
   if (items.length === 0) return null;
 

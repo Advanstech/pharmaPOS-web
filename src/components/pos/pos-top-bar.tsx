@@ -40,9 +40,9 @@ export function PosTopBar() {
       className="flex flex-wrap items-center justify-between gap-y-2 px-3 sm:px-5 py-1.5 min-h-14 shrink-0"
       style={{
         background:
-          'linear-gradient(135deg, color-mix(in oklab, var(--color-teal-dark) 85%, #000 15%) 0%, var(--color-teal-dark) 48%, var(--color-teal) 100%)',
-        boxShadow: '0 2px 12px rgba(0,78,87,0.42)',
-        borderBottom: '1px solid rgba(255,255,255,0.16)',
+          'linear-gradient(135deg, #004D55 0%, #006D77 48%, #0d9488 100%)',
+        boxShadow: '0 2px 12px rgba(0,78,87,0.5)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
       }}
     >
       {/* Left: brand + branch */}

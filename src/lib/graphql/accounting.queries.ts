@@ -154,18 +154,132 @@ export const CASH_FLOW_FORECAST = gql`
 `;
 
 export const LIST_EXPENSES = gql`
-  query ListExpenses($status: String) {
-    listExpenses(status: $status) {
+  query ListExpenses($status: ExpenseStatus, $startDate: String, $endDate: String) {
+    staffExpenses(status: $status, startDate: $startDate, endDate: $endDate) {
       id
       category
       amountPesewas
       amountFormatted
       description
+      merchantName
       expenseDate
+      receiptUrl
       status
       createdByName
       approvedByName
+      approvedAt
       createdAt
+    }
+  }
+`;
+
+
+// ── New Financial Queries ─────────────────────────────────────────────────────
+
+export const TRIAL_BALANCE = gql`
+  query TrialBalance($asOfDate: String) {
+    trialBalance(asOfDate: $asOfDate) {
+      accountCode
+      accountName
+      totalDebit
+      totalCredit
+      balance
+      balanceFormatted
+      balanceType
+    }
+  }
+`;
+
+export const BALANCE_SHEET = gql`
+  query BalanceSheet($asOfDate: String) {
+    balanceSheet(asOfDate: $asOfDate) {
+      asOfDate
+      assets {
+        accountCode
+        accountName
+        balancePesewas
+        balanceFormatted
+      }
+      totalAssetsPesewas
+      totalAssetsFormatted
+      liabilities {
+        accountCode
+        accountName
+        balancePesewas
+        balanceFormatted
+      }
+      totalLiabilitiesPesewas
+      totalLiabilitiesFormatted
+      equity {
+        accountCode
+        accountName
+        balancePesewas
+        balanceFormatted
+      }
+      totalEquityPesewas
+      totalEquityFormatted
+      isBalanced
+    }
+  }
+`;
+
+export const GL_DETAIL = gql`
+  query GLDetail($accountCode: String, $startDate: String, $endDate: String) {
+    glDetail(accountCode: $accountCode, startDate: $startDate, endDate: $endDate) {
+      id
+      accountCode
+      accountName
+      debit
+      credit
+      description
+      referenceType
+      referenceId
+      postedAt
+    }
+  }
+`;
+
+export const CHART_OF_ACCOUNTS = gql`
+  query ChartOfAccounts {
+    chartOfAccounts {
+      accountCode
+      accountName
+      accountType
+      category
+      balancePesewas
+      balanceFormatted
+    }
+  }
+`;
+
+export const FINANCIAL_SUMMARY = gql`
+  query FinancialSummary($periodStart: String!, $periodEnd: String!) {
+    financialSummary(periodStart: $periodStart, periodEnd: $periodEnd) {
+      periodStart
+      periodEnd
+      revenuePesewas
+      revenueFormatted
+      cogsPesewas
+      cogsFormatted
+      grossProfitPesewas
+      grossProfitFormatted
+      grossMarginPct
+      operatingExpensesPesewas
+      operatingExpensesFormatted
+      netProfitPesewas
+      netProfitFormatted
+      netMarginPct
+      cashBalancePesewas
+      cashBalanceFormatted
+      accountsPayablePesewas
+      accountsPayableFormatted
+      vatPayablePesewas
+      vatPayableFormatted
+      inventoryValuePesewas
+      inventoryValueFormatted
+      totalTransactions
+      totalExpenses
+      pendingExpenses
     }
   }
 `;

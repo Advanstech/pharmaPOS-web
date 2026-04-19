@@ -10,6 +10,7 @@ import { DASHBOARD_NAV } from '@/lib/auth/dashboard-nav';
 import { roleForAccess } from '@/lib/auth/post-login-path';
 import { useRef, useState } from 'react';
 import { useNestedLenis } from '@/lib/lenis/use-nested-lenis';
+import { BranchSwitcher } from '@/components/dashboard/branch-switcher';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -78,10 +79,22 @@ export function Sidebar() {
             PharmaPOS Pro
           </p>
           <p className="text-[10px] mt-0.5 truncate" style={{ color: 'color-mix(in oklab, var(--text-secondary) 88%, #000 12%)' }}>
-            {'Azzay Pharmacy'}
+            {user?.branchName || 'Azzay Pharmacy'}
           </p>
+          {user?.branchType && (
+            <span className="inline-flex items-center mt-1 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider"
+              style={{
+                background: user.branchType === 'pharmaceutical' ? 'rgba(13,148,136,0.12)' : 'rgba(234,88,12,0.12)',
+                color: user.branchType === 'pharmaceutical' ? '#0d9488' : '#ea580c',
+              }}>
+              {user.branchType === 'pharmaceutical' ? '💊 Pharmacy' : '🧪 Chemical'}
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Branch switcher — owners/se_admin only */}
+      {!collapsed && <div className="px-2 mt-2"><BranchSwitcher /></div>}
 
       {/* Nav — min-h-0 + flex-1 so this region scrolls; Lenis smooths wheel when motion OK */}
       <nav

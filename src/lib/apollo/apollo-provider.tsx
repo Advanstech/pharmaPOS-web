@@ -5,7 +5,6 @@ import {
   ApolloLink,
   InMemoryCache,
   split,
-  HttpLink,
   type NormalizedCacheObject,
 } from '@apollo/client';
 import { authErrorLink } from '@/lib/apollo/auth-error-link';
@@ -16,16 +15,38 @@ import { createClient } from 'graphql-ws';
 import { ApolloProvider as BaseApolloProvider } from '@apollo/client';
 import { useRef } from 'react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import createUploadLink from 'apollo-upload-client/createUploadLink.mjs';
 
 function makeClient(getToken: () => string | null): ApolloClient<NormalizedCacheObject> {
-  const httpLink = new HttpLink({
-    uri: getGraphqlHttpUri(),
-    // Attach JWT from in-memory store on every request
-    fetch: (uri, options) => {
+  // Always use the Next.js proxy in the browser to avoid CORS and direct connection issues
+  const graphqlUri = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/graphql`
+    : (process.env.API_PROXY_TARGET || 'http://127.0.0.1:4000') + '/graphql';
+  
+  // Create upload-capable HTTP link using apollo-upload-client
+  const uploadLink = createUploadLink({
+    uri: graphqlUri,
+    fetch: (uri: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
+      const headers = new Headers(options?.headers ?? {});
       const token = getToken();
-      const headers = new Headers(options?.headers);
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      return fetch(uri, { ...options, headers });
+      if (token && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
+      return fetch(uri, {
+        ...options,
+        headers,
+      }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          console.debug('[Apollo HTTP] Request aborted');
+        } else if (/load failed/i.test(message)) {
+          console.warn('[Apollo HTTP] Network request failed');
+        } else {
+          console.error('[Apollo HTTP] Fetch error:', error);
+        }
+        throw error;
+      });
     },
   });
 
@@ -57,24 +78,74 @@ function makeClient(getToken: () => string | null): ApolloClient<NormalizedCache
       return def.kind === 'OperationDefinition' && def.operation === 'subscription';
     },
     wsLink,
-    httpLink,
+    uploadLink as any,  // Use upload-capable link for HTTP
   );
 
   const link = ApolloLink.from([authErrorLink, splitLink]);
 
   return new ApolloClient({
     link,
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+      // Type policies for better caching and normalization
+      typePolicies: {
+        Query: {
+          fields: {
+            // Cache inventory list by branch
+            listInventory: {
+              keyArgs: false, // Don't use args for cache key
+              merge(existing, incoming) {
+                return incoming;
+              },
+            },
+            // Cache sales by date
+            dailySummary: {
+              keyArgs: ['date'],
+            },
+            recentSales: {
+              keyArgs: false,
+              merge(existing, incoming) {
+                return incoming;
+              },
+            },
+            // Cache low stock alerts
+            lowStockAlerts: {
+              keyArgs: false,
+              merge(existing, incoming) {
+                return incoming;
+              },
+            },
+            myStockAlerts: {
+              keyArgs: false,
+              merge(existing, incoming) {
+                return incoming;
+              },
+            },
+          },
+        },
+      },
+    }),
     defaultOptions: {
-      watchQuery: { fetchPolicy: 'cache-and-network' },
+      watchQuery: { 
+        fetchPolicy: 'cache-and-network',
+        errorPolicy: 'all',
+      },
+      query: {
+        fetchPolicy: 'network-only', // Always fetch fresh data for now
+        errorPolicy: 'all',
+      },
+      mutate: {
+        errorPolicy: 'all',
+      },
     },
+    // Enable query deduplication for better performance
+    queryDeduplication: true,
   });
 }
 
 export function ApolloProvider({ children }: { children: React.ReactNode }) {
   const getToken = () => useAuthStore.getState().accessToken;
-  // Stable client ref — recreated only on mount
   const clientRef = useRef<ApolloClient<NormalizedCacheObject> | null>(null);
+  // Always recreate on first client-side render so the browser URL is used
   if (!clientRef.current) {
     clientRef.current = makeClient(getToken);
   }

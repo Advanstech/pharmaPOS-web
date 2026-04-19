@@ -193,6 +193,10 @@ export interface AuthUser {
   email?: string | null;
   role: UserRole;
   branch_id: string;
+  /** Branch display name — e.g. "Azzay Pharmacy — Main Branch" */
+  branchName?: string;
+  /** Branch type — determines POM dispensing capability */
+  branchType?: 'pharmaceutical' | 'chemical';
 }
 
 export interface TokenPair {

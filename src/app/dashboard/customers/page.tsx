@@ -22,6 +22,9 @@ interface CustomerRow {
   customerCode: string;
   name?: string | null;
   hasPhone: boolean;
+  email?: string | null;
+  hasEmail?: boolean;
+  receiptPreference?: string | null;
   sex?: string | null;
   ageYears?: number | null;
   hasGhanaCard: boolean;
@@ -107,6 +110,7 @@ export default function CustomersPage() {
     const fd = new FormData(e.currentTarget);
     const name = (fd.get('name') as string)?.trim() || undefined;
     const phone = (fd.get('phone') as string)?.trim() || undefined;
+    const email = (fd.get('email') as string)?.trim() || undefined;
     const sexRaw = (fd.get('sex') as string)?.trim();
     const ageStr = (fd.get('ageYears') as string)?.trim();
     const ageYears = ageStr ? parseInt(ageStr, 10) : undefined;
@@ -117,6 +121,7 @@ export default function CustomersPage() {
           input: {
             ...(name ? { name } : {}),
             ...(phone ? { phone } : {}),
+            ...(email ? { email } : {}),
             ...(sexRaw ? { sex: sexRaw } : {}),
             ...(ageYears != null && !Number.isNaN(ageYears) ? { ageYears } : {}),
             ...(gh ? { ghanaCardNumber: gh } : {}),
@@ -147,6 +152,8 @@ export default function CustomersPage() {
       name,
     };
     if (phone.length > 0) input.phone = phone;
+    const emailVal = (fd.get('email') as string)?.trim() ?? '';
+    if (emailVal.length > 0) input.email = emailVal;
     if (removeGhana) input.ghanaCardNumber = '';
     else if (gh.length > 0) input.ghanaCardNumber = gh;
     if (sexRaw) input.sex = sexRaw;
@@ -222,6 +229,10 @@ export default function CustomersPage() {
                 Phone (mobile)
                 <input name="phone" type="tel" className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm" />
               </label>
+              <label className="block text-xs font-semibold text-content-secondary sm:col-span-2">
+                Email (for receipts &amp; promotions)
+                <input name="email" type="email" placeholder="customer@example.com" className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm" />
+              </label>
               <label className="block text-xs font-semibold text-content-secondary">
                 Sex
                 <select name="sex" className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm">
@@ -282,12 +293,13 @@ export default function CustomersPage() {
             <tr>
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Sex</th>
               <th className="px-4 py-3">Age</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">Ghana Card</th>
               <th className="px-4 py-3">Since</th>
-              {canEdit ? <th className="px-4 py-3 w-24" /> : null}
+              <th className="px-4 py-3 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -307,28 +319,38 @@ export default function CustomersPage() {
             )}
             {!loading &&
               pagedRows.map((r) => (
-                <tr key={r.id} className="border-b border-surface-border last:border-0 hover:bg-surface-hover/40">
+                <tr key={r.id} className="border-b border-surface-border last:border-0 hover:bg-surface-hover/40 transition-colors">
                   <td className="px-4 py-3 font-mono font-semibold text-teal-700 dark:text-teal-400">
                     {r.customerCode}
                   </td>
-                  <td className="px-4 py-3 text-content-primary">{r.name?.trim() ? r.name : '—'}</td>
+                  <td className="px-4 py-3 text-content-primary font-medium">{r.name?.trim() ? r.name : '—'}</td>
+                  <td className="px-4 py-3">{r.email || '—'}</td>
                   <td className="px-4 py-3">{formatSex(r.sex)}</td>
                   <td className="px-4 py-3">{r.ageYears != null ? r.ageYears : '—'}</td>
                   <td className="px-4 py-3">{r.hasPhone ? 'On file' : '—'}</td>
                   <td className="px-4 py-3">{r.hasGhanaCard ? 'On file' : '—'}</td>
                   <td className="px-4 py-3 text-content-muted">{formatAccraDate(r.createdAt)}</td>
-                  {canEdit ? (
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setEditRow(r)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-surface-border px-2 py-1 text-xs font-medium hover:bg-surface-hover"
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={`/dashboard/customers/${r.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-colors hover:bg-surface-hover"
+                        style={{ color: 'var(--color-teal)' }}
                       >
-                        <Pencil size={12} />
-                        Edit
-                      </button>
-                    </td>
-                  ) : null}
+                        View
+                      </a>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => setEditRow(r)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-surface-border px-2 py-1 text-xs font-medium hover:bg-surface-hover"
+                        >
+                          <Pencil size={12} />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
           </tbody>
@@ -375,6 +397,16 @@ export default function CustomersPage() {
                   <input
                     name="name"
                     defaultValue={editRow.name ?? ''}
+                    className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-xs font-semibold text-content-secondary sm:col-span-2">
+                  Email (for receipts &amp; promotions)
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={editRow.email ?? ''}
+                    placeholder="customer@example.com"
                     className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm"
                   />
                 </label>
