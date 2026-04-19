@@ -100,11 +100,10 @@ export function Cart() {
     setTenderMode('idle');
   };
 
-  useNestedLenis(cartScrollRef, cartInnerRef, {
-    enabled: !prefersReduced,
-    layoutKey: items.length,
-    syncTouch: true,
-  });
+  // Disable Lenis on cart — native scroll works correctly with CSS zoom
+  // Lenis measures container dimensions before zoom which breaks scroll at 110%+
+  // Native overflow-y-auto + scroll-smooth handles this perfectly
+  void cartScrollRef; void cartInnerRef; void prefersReduced;
 
   const handleCheckout = async (method: string) => {
     setCheckoutError(null);
@@ -206,12 +205,23 @@ export function Cart() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col relative" style={{ background: 'var(--surface-card)' }}>
-
+    <div
+      style={{
+        background: 'var(--surface-card)',
+        height: '100%',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        scrollBehavior: 'smooth',
+        position: 'relative',
+      }}
+    >
+      {/* Inner content — flows naturally, outer div scrolls */}
+      <div>
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: '1px solid var(--surface-border)' }}
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: '1px solid var(--surface-border)', position: 'sticky', top: 0, background: 'var(--surface-card)', zIndex: 4 }}
       >
         <div className="flex items-center gap-2">
           <ShoppingCart size={16} style={{ color: 'var(--color-teal)' }} aria-hidden="true" />
@@ -244,11 +254,10 @@ export function Cart() {
 
       <PosCustomerAttach />
 
-      {/* Items — nested Lenis for smooth wheel + touch on POS / tablet */}
+      {/* Items — no separate scroll needed, outer div handles it */}
       <div
         ref={cartScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth px-3 py-2"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ padding: '8px 12px' }}
       >
         <div ref={cartInnerRef}>
         {items.length === 0 ? (
@@ -351,13 +360,13 @@ export function Cart() {
         </div>
       </div>
 
-      {/* Order summary + payment */}
+      {/* Order summary — compact */}
       {items.length > 0 && (
-        <div className="shrink-0 px-4 pt-3 pb-4 space-y-2.5"
-          style={{ borderTop: '1px solid var(--surface-border)' }}>
-
-          {/* Compact totals row */}
-          <div className="space-y-1">
+        <div
+          className="px-4 pt-2 pb-1"
+          style={{ borderTop: '1px solid var(--surface-border)' }}
+        >
+          <div className="space-y-0.5">
             <div className="flex justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
               <span>Subtotal</span>
               <GhsMoney amount={subtotal} className="font-mono text-xs" />
@@ -366,26 +375,32 @@ export function Cart() {
               <span>VAT 15%</span>
               <GhsMoney amount={vat} className="font-mono text-xs" />
             </div>
-            <div className="flex justify-between font-bold text-base pt-1.5"
+            <div className="flex justify-between font-bold text-sm pt-1"
               style={{ borderTop: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
               <span>Total (GHS)</span>
-              <GhsMoney amount={grandTotal} className="font-mono font-bold text-base" />
+              <GhsMoney amount={grandTotal} className="font-mono font-bold text-sm" />
             </div>
           </div>
+        </div>
+      )}
 
+      {/* Payment buttons */}
+      {items.length > 0 && (
+        <div
+          className="px-3 pb-6 pt-2"
+          style={{ background: 'var(--surface-card)' }}
+        >
           {checkoutError && (
-            <div className="rounded-xl px-3 py-2 text-[11px] font-medium text-center"
+            <div className="rounded-xl px-3 py-1.5 text-[11px] font-medium text-center mb-2"
               style={{ background: 'rgba(220,38,38,0.1)', color: '#b91c1c' }} role="alert">
               {checkoutError}
             </div>
           )}
-
-          {/* Payment method buttons — always visible, always full width */}
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setTenderMode('cash')}
               disabled={saleSubmitting}
-              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[52px] disabled:opacity-60"
+              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[48px] disabled:opacity-60"
               style={{ background: 'linear-gradient(135deg,var(--color-teal-dark),var(--color-teal))', boxShadow: '0 2px 10px rgba(0,109,119,0.3)' }}
             >
               <Banknote size={16} /> Cash
@@ -393,7 +408,7 @@ export function Cart() {
             <button
               onClick={() => setTenderMode('momo')}
               disabled={!isOnline || saleSubmitting}
-              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[52px] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[48px] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'linear-gradient(135deg,#c47d0e,var(--color-gold))', boxShadow: '0 2px 10px rgba(232,168,56,0.3)' }}
               title={!isOnline ? 'MoMo requires internet' : undefined}
             >
@@ -663,6 +678,7 @@ export function Cart() {
         pendingSync={recordedPendingSync}
         customerReceiptLine={receiptCustomerLine}
       />
+      </div>
     </div>
   );
 }

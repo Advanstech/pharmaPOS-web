@@ -23,22 +23,40 @@ export function PosShell() {
 
   if (!ready) {
     return (
-      <div className="flex items-center justify-center h-screen" style={{ background: 'var(--surface-base)' }}>
+      <div
+        className="flex items-center justify-center"
+        style={{ background: 'var(--surface-base)', position: 'fixed', inset: 0 }}
+      >
         <div className="absolute top-0 left-0 right-0 h-14 animate-pulse" style={{ background: 'var(--color-teal-dark)' }} />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-hidden overscroll-none" style={{ background: 'var(--surface-base)' }}>
+    <div
+      className="flex min-h-0 flex-col overflow-hidden overscroll-none"
+      style={{
+        background: 'var(--surface-base)',
+        height: '100dvh',
+        maxHeight: '100dvh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
+    >
       <PosTopBar />
       <OfflineBanner />
 
-      <main className="flex min-h-0 flex-1 overflow-hidden relative">
+      <main
+        className="flex min-h-0 flex-1 relative"
+        style={{ overflow: 'hidden' }}
+      >
         {/* Product search — full width on mobile, 60% on desktop */}
         <section
-          className="flex min-h-0 w-full flex-col overflow-hidden lg:w-[60%]"
-          style={{ borderRight: '1px solid var(--surface-border)' }}
+          className="flex min-h-0 w-full flex-col lg:w-[60%]"
+          style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden', height: '100%' }}
         >
           <ErrorBoundary>
             <Suspense fallback={null}>
@@ -48,7 +66,10 @@ export function PosShell() {
         </section>
 
         {/* Desktop cart — 40% right panel (hidden on mobile) */}
-        <section className="hidden min-h-0 w-[40%] flex-col overflow-hidden lg:flex">
+        <section
+          className="hidden min-h-0 w-[40%] lg:flex flex-col"
+          style={{ overflow: 'hidden', height: '100%' }}
+        >
           <ErrorBoundary>
             <Cart />
           </ErrorBoundary>
