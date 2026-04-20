@@ -292,7 +292,7 @@ function OverviewTab({ pl, cf, openPayables, pendingExpenses, waterfallData, exp
         <QuickLink icon={CreditCard} label="Record Payment" sub="Pay supplier invoices" href="/dashboard/accounting/invoices" color="#3b82f6" />
         <QuickLink icon={ReceiptText} label="Upload Invoice" sub="OCR scan & import" href="/dashboard/invoices/upload" color="#0d9488" />
         <QuickLink icon={DollarSign} label="New Expense" sub="Submit for approval" href="/dashboard/expenses/new" color="#f59e0b" />
-        <QuickLink icon={BarChart3} label="CFO Briefing" sub="Full financial analysis" href="/dashboard/cfo-briefing" color="#8b5cf6" />
+        <QuickLink icon={BarChart3} label="CFO Briefing" sub="Full financial analysis" href="/dashboard/cfo" color="#8b5cf6" />
       </div>
 
       {/* ── Recent Activity (compact) ── */}

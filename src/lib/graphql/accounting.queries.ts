@@ -38,6 +38,13 @@ export const CFO_BRIEFING = gql`
         projectedNextMonthFormatted
         trendSignal
         insight
+        paymentMix {
+          method
+          label
+          totalPesewas
+          totalFormatted
+          sharePct
+        }
       }
       investmentIntelligence {
         qualifiesForInvestment

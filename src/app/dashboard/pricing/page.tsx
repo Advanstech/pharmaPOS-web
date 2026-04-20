@@ -41,10 +41,12 @@ export default function PricingPage() {
 
   const [query, setQuery] = useState('');
   const [defaultMargin, setDefaultMargin] = useState(25);
+  const [showBulkPanel, setShowBulkPanel] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
   const [editReason, setEditReason] = useState('');
+  const [reasonFocused, setReasonFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -183,17 +185,12 @@ export default function PricingPage() {
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Cost-based margin pricing, manual overrides, and price history</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)' }}>
-                <Percent size={12} style={{ color: 'var(--text-muted)' }} />
-                <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>Margin</span>
-                <input type="number" min={0} step={1} value={defaultMargin} onChange={e => setDefaultMargin(Number(e.target.value) || 0)}
-                  className="w-12 bg-transparent text-sm font-bold text-center outline-none" style={{ color: 'var(--text-primary)' }} />
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>%</span>
-              </div>
-              <button onClick={handleBulkApply} disabled={bulkUpdating || updating}
-                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}>
-                <DollarSign size={13} /> {bulkUpdating ? 'Applying...' : 'Bulk Apply Margin'}
+              <button
+                onClick={() => setShowBulkPanel(v => !v)}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}
+              >
+                <DollarSign size={13} /> Set Prices by Margin
               </button>
             </div>
           </div>
@@ -205,6 +202,20 @@ export default function PricingPage() {
             <MiniKpi label="Below 20% Margin" value={String(stats.belowMargin)} color={stats.belowMargin > 0 ? '#f59e0b' : '#16a34a'} />
             <MiniKpi label="At Loss" value={String(stats.atLoss)} color={stats.atLoss > 0 ? '#dc2626' : '#16a34a'} />
           </div>
+
+          {/* Bulk margin panel */}
+          {showBulkPanel && (
+            <BulkMarginPanel
+              defaultMargin={defaultMargin}
+              onMarginChange={setDefaultMargin}
+              affectedCount={rows.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).length}
+              totalWithCost={stats.withCost}
+              previewRows={rows.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).slice(0, 4)}
+              loading={bulkUpdating}
+              onApply={() => { void handleBulkApply(); setShowBulkPanel(false); }}
+              onClose={() => setShowBulkPanel(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -271,25 +282,40 @@ export default function PricingPage() {
 
                   {/* Inline edit form */}
                   {isEditing && (
-                    <div className="px-4 pb-3 flex items-end gap-3" style={{ background: 'rgba(13,148,136,0.03)' }}>
-                      <div className="flex-1 max-w-[140px]">
-                        <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>New Price (GHS)</label>
-                        <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)}
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-sm font-mono font-bold"
-                          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+                    <div className="px-4 pb-3 space-y-2" style={{ background: 'rgba(13,148,136,0.03)' }}>
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 max-w-[140px]">
+                          <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>New Price (GHS)</label>
+                          <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                            className="w-full rounded-lg border px-2.5 py-1.5 text-sm font-mono font-bold"
+                            style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>Reason</label>
+                          <input
+                            value={editReason}
+                            onChange={e => setEditReason(e.target.value)}
+                            onFocus={() => setReasonFocused(true)}
+                            onBlur={() => setTimeout(() => setReasonFocused(false), 150)}
+                            placeholder="e.g. Supplier price increase"
+                            className="w-full rounded-lg border px-2.5 py-1.5 text-xs"
+                            style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+                        <button onClick={() => handleSavePrice(row.product.id)} disabled={updating}
+                          className="rounded-lg px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50" style={{ background: '#0d9488' }}>
+                          {updating ? 'Saving...' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                          style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>Cancel</button>
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>Reason</label>
-                        <input value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="e.g. Supplier price increase"
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-xs"
-                          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
-                      </div>
-                      <button onClick={() => handleSavePrice(row.product.id)} disabled={updating}
-                        className="rounded-lg px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50" style={{ background: '#0d9488' }}>
-                        {updating ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-                        style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>Cancel</button>
+                      {/* Reason suggestion chips — only visible when reason field is focused */}
+                      {reasonFocused && (
+                        <PriceReasonSuggestions
+                          current={editReason}
+                          onSelect={r => { setEditReason(r); setReasonFocused(false); }}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -319,6 +345,199 @@ export default function PricingPage() {
           {/* Price History Sidebar */}
           <PriceHistorySidebar selectedId={selectedId} historyData={historyData?.productPriceHistory ?? []} historyLoading={historyLoading} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+const PRICE_REASONS = [
+  'Supplier price increase',
+  'Supplier price decrease',
+  'Annual price review',
+  'Promotional discount',
+  'Seasonal adjustment',
+  'Exchange rate change',
+  'New supplier — lower cost',
+  'Bulk purchase discount',
+  'Expiry clearance',
+  'Market price alignment',
+  'GRA/VAT adjustment',
+  'NHIS tariff update',
+];
+
+function PriceReasonSuggestions({ current, onSelect }: { current: string; onSelect: (r: string) => void }) {
+  const suggestions = current.trim().length === 0
+    ? PRICE_REASONS
+    : PRICE_REASONS.filter(r => r.toLowerCase().includes(current.toLowerCase()) && r.toLowerCase() !== current.toLowerCase());
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {suggestions.slice(0, 6).map(reason => (
+        <button
+          key={reason}
+          type="button"
+          onMouseDown={e => e.preventDefault()} // prevent input blur before click fires
+          onClick={() => onSelect(reason)}
+          className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all hover:opacity-80 active:scale-95"
+          style={{
+            background: current === reason ? 'rgba(13,148,136,0.15)' : 'var(--surface-base)',
+            border: `1px solid ${current === reason ? 'rgba(13,148,136,0.4)' : 'var(--surface-border)'}`,
+            color: current === reason ? '#0d9488' : 'var(--text-secondary)',
+          }}
+        >
+          {reason}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BulkMarginPanel({
+  defaultMargin, onMarginChange, affectedCount, totalWithCost,
+  previewRows, loading, onApply, onClose,
+}: {
+  defaultMargin: number;
+  onMarginChange: (v: number) => void;
+  affectedCount: number;
+  totalWithCost: number;
+  previewRows: Array<{ product: { name: string }; costFormatted: string; sellPesewas: number; suggestedSell: number }>;
+  loading: boolean;
+  onApply: () => void;
+  onClose: () => void;
+}) {
+  const PRESETS = [15, 20, 25, 30, 40, 50];
+
+  return (
+    <div className="mt-4 rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid rgba(13,148,136,0.25)', boxShadow: '0 4px 24px rgba(13,148,136,0.1)' }}>
+      {/* Header */}
+      <div className="flex items-start justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(13,148,136,0.04)' }}>
+        <div>
+          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            💰 Set Selling Prices by Profit Margin
+          </h3>
+          <p className="text-xs mt-1 max-w-xl leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            This tool automatically calculates the right selling price for each product so you always make a profit.
+            You choose how much profit you want (e.g. 25%), and it updates all your prices at once.
+          </p>
+        </div>
+        <button onClick={onClose} className="ml-4 shrink-0 text-xs font-bold rounded-lg px-2.5 py-1.5 hover:bg-surface-hover"
+          style={{ color: 'var(--text-muted)', border: '1px solid var(--surface-border)' }}>
+          Close
+        </button>
+      </div>
+
+      <div className="px-5 py-4 space-y-5">
+        {/* Step 1 — choose margin */}
+        <div>
+          <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            Step 1 — Choose your profit margin
+          </p>
+          <p className="text-[11px] mb-3 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Margin is how much profit you make on top of what you paid for the product.
+            For example, if a product costs <strong>GH₵10</strong> and you set <strong>25% margin</strong>, the selling price becomes <strong>GH₵12.50</strong>.
+          </p>
+
+          {/* Preset chips */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            {PRESETS.map(p => (
+              <button
+                key={p}
+                onClick={() => onMarginChange(p)}
+                className="rounded-full px-3 py-1.5 text-xs font-bold transition-all"
+                style={
+                  defaultMargin === p
+                    ? { background: '#0d9488', color: '#fff', boxShadow: '0 2px 8px rgba(13,148,136,0.3)' }
+                    : { background: 'var(--surface-base)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }
+                }
+              >
+                {p}%
+                {p === 25 && <span className="ml-1 text-[9px] opacity-70">recommended</span>}
+              </button>
+            ))}
+            {/* Custom input */}
+            <div className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs"
+              style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Custom:</span>
+              <input
+                type="number" min={1} max={200} value={defaultMargin}
+                onChange={e => onMarginChange(Math.max(1, Number(e.target.value) || 25))}
+                className="w-10 bg-transparent text-center font-bold outline-none text-xs"
+                style={{ color: 'var(--text-primary)' }}
+              />
+              <span style={{ color: 'var(--text-muted)' }}>%</span>
+            </div>
+          </div>
+
+          {/* Live example */}
+          <div className="rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Example: </span>
+            <span style={{ color: 'var(--text-primary)' }}>
+              Product costs <strong>GH₵10.00</strong> → selling price at <strong>{defaultMargin}% margin</strong> = <strong style={{ color: '#0d9488' }}>GH₵{(10 * (1 + defaultMargin / 100)).toFixed(2)}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Step 2 — preview */}
+        <div>
+          <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            Step 2 — Preview what will change
+          </p>
+          {totalWithCost === 0 ? (
+            <div className="rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(180,83,9,0.06)', border: '1px solid rgba(180,83,9,0.2)', color: '#b45309' }}>
+              ⚠️ No products have supplier cost data yet. Receive stock from a supplier invoice first — the system will record the cost automatically.
+            </div>
+          ) : affectedCount === 0 ? (
+            <div className="rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', color: '#15803d' }}>
+              ✓ All {totalWithCost} products with cost data are already priced at {defaultMargin}% margin or above. No changes needed.
+            </div>
+          ) : (
+            <>
+              <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>{affectedCount} product{affectedCount !== 1 ? 's' : ''}</strong> will have their prices updated:
+              </p>
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
+                <div className="grid px-3 py-2 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ gridTemplateColumns: '1fr 80px 80px 80px', background: 'var(--surface-base)', color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)' }}>
+                  <span>Product</span><span>Cost</span><span>Old price</span><span>New price</span>
+                </div>
+                {previewRows.map(r => (
+                  <div key={r.product.name} className="grid px-3 py-2 text-xs items-center"
+                    style={{ gridTemplateColumns: '1fr 80px 80px 80px', borderTop: '1px solid var(--surface-border)' }}>
+                    <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>{r.product.name}</span>
+                    <span className="font-mono" style={{ color: 'var(--text-muted)' }}>{r.costFormatted}</span>
+                    <span className="font-mono line-through" style={{ color: 'var(--text-muted)' }}>{fmt(r.sellPesewas)}</span>
+                    <span className="font-mono font-bold" style={{ color: '#0d9488' }}>{fmt(r.suggestedSell)}</span>
+                  </div>
+                ))}
+                {affectedCount > 4 && (
+                  <div className="px-3 py-2 text-[10px]" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+                    + {affectedCount - 4} more products
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Step 3 — confirm */}
+        {affectedCount > 0 && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={onApply}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-all hover:scale-[1.01]"
+              style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)', boxShadow: '0 4px 14px rgba(13,148,136,0.3)' }}
+            >
+              <DollarSign size={15} />
+              {loading ? 'Updating prices…' : `Update ${affectedCount} price${affectedCount !== 1 ? 's' : ''} now`}
+            </button>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              All changes are saved to price history and can be reviewed anytime.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

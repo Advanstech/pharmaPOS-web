@@ -23,6 +23,16 @@ export const LIST_STOCK_TRANSFERS = gql`
   }
 `;
 
+export const BRANCHES_QUERY = gql`
+  query Branches {
+    branches {
+      id
+      name
+      type
+    }
+  }
+`;
+
 export const CREATE_STOCK_TRANSFER = gql`
   mutation CreateStockTransfer($input: CreateStockTransferInput!) {
     createStockTransfer(input: $input) {

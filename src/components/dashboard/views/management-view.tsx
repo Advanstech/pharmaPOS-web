@@ -352,7 +352,7 @@ export function ManagementView({ user }: ManagementViewProps) {
               { href: '/dashboard/expenses', icon: CreditCard, label: 'Expenses', color: '#f59e0b', badge: pendingExpenses > 0 ? String(pendingExpenses) : undefined },
               { href: '/dashboard/transfers', icon: Package, label: 'Transfers', color: '#8b5cf6' },
               { href: '/dashboard/accounting', icon: DollarSign, label: 'Accounting', color: '#0d9488' },
-              { href: '/dashboard/cfo-briefing', icon: Zap, label: 'CFO Brief', color: '#f59e0b' },
+              { href: '/dashboard/cfo', icon: Zap, label: 'CFO Brief', color: '#f59e0b' },
             ].map(action => (
               <Link key={action.href} href={action.href}
                 className="group flex items-center gap-2 rounded-xl p-2.5 transition-all hover:scale-[1.02]"

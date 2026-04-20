@@ -3,10 +3,11 @@
 import { useEffect, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Package, Tag, Layers, Truck } from 'lucide-react';
+import { X, Package, Tag, Layers, Truck, BrainCircuit } from 'lucide-react';
 import { ProductImage } from './product-image';
 import { ClassificationBadge } from './classification-badge';
 import { PomRxModal } from './pom-rx-modal';
+import { DrugIntelligencePanel } from '@/components/ai/drug-intelligence-panel';
 import { useCartStore } from '@/lib/store/cart.store';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { GhsMoney } from '@/components/ui/ghs-money';
@@ -31,6 +32,7 @@ export function ProductDetailPanel({ product, onClose, shouldReduceMotion }: Pro
   const setCartPrescriptionId = useCartStore((s) => s.setPrescriptionId);
   const user = useAuthStore((s) => s.user);
   const [pomRxOpen, setPomRxOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const branchId = user?.branch_id ?? '';
   const sessionPeakTotal = useInventorySyncStore((s) =>
     branchId ? s.displayCaps[stockSnapshotKey(branchId, product.id)] : undefined,
@@ -126,6 +128,25 @@ export function ProductDetailPanel({ product, onClose, shouldReduceMotion }: Pro
             aria-label="Close product details"
           >
             <X size={16} style={{ color: 'var(--text-secondary)' }} />
+          </button>        </div>
+
+        {/* AI Drug Intelligence button */}
+        <div className="px-4 pt-2 shrink-0">
+          <button
+            onClick={() => setAiPanelOpen(true)}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,109,119,0.1) 0%, rgba(232,168,56,0.08) 100%)',
+              border: '1px solid rgba(0,109,119,0.25)',
+              color: 'var(--color-teal-dark)',
+            }}
+          >
+            <BrainCircuit size={14} />
+            <span>AI Drug Intelligence</span>
+            <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase"
+              style={{ background: 'rgba(0,109,119,0.15)', color: 'var(--color-teal)' }}>
+              GPT-4o
+            </span>
           </button>
         </div>
 
@@ -361,6 +382,13 @@ export function ProductDetailPanel({ product, onClose, shouldReduceMotion }: Pro
           onClose();
         }}
       />
+
+      {aiPanelOpen && (
+        <DrugIntelligencePanel
+          product={product}
+          onClose={() => setAiPanelOpen(false)}
+        />
+      )}
     </>
   );
 }

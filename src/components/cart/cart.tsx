@@ -363,7 +363,7 @@ export function Cart() {
       {/* Order summary — compact */}
       {items.length > 0 && (
         <div
-          className="px-4 pt-2 pb-1"
+          className="px-4 pt-6 pb-1"
           style={{ borderTop: '1px solid var(--surface-border)' }}
         >
           <div className="space-y-0.5">
@@ -387,7 +387,7 @@ export function Cart() {
       {/* Payment buttons */}
       {items.length > 0 && (
         <div
-          className="px-3 pb-6 pt-2"
+          className="px-3 pb-6 pt-4"
           style={{ background: 'var(--surface-card)' }}
         >
           {checkoutError && (

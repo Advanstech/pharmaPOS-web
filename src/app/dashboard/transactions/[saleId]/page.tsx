@@ -16,6 +16,10 @@ import {
   Printer,
   RotateCcw,
   AlertTriangle,
+  Banknote,
+  Smartphone,
+  CreditCard,
+  SplitSquareHorizontal,
 } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { SALE_DETAIL, REFUND_SALE, REQUEST_REFUND } from '@/lib/graphql/sales.queries';
@@ -39,6 +43,12 @@ type SaleDetail = {
   idempotencyKey: string;
   soldAt?: string | null;
   createdAt: string;
+  tenders: Array<{
+    method: string;
+    amountPesewas: number;
+    amountFormatted: string;
+    momoReference?: string | null;
+  }>;
   items: Array<{
     id: string;
     productId: string;
@@ -73,6 +83,25 @@ function stockStatusStyle(status: string): { label: string; bg: string; color: s
       return { label: 'Low', bg: 'var(--stock-pill-low-bg)', color: 'var(--stock-pill-low-fg)' };
     default:
       return { label: 'OK', bg: 'var(--stock-pill-ok-bg)', color: 'var(--stock-pill-ok-fg)' };
+  }
+}
+
+type TenderMeta = { label: string; icon: React.ReactNode; bg: string; color: string; border: string };
+
+function tenderMeta(method: string): TenderMeta {
+  switch (method) {
+    case 'MTN_MOMO':
+      return { label: 'MTN MoMo', icon: <Smartphone size={14} />, bg: 'rgba(255,204,0,0.12)', color: '#92400e', border: 'rgba(255,204,0,0.4)' };
+    case 'VODAFONE_CASH':
+      return { label: 'Vodafone Cash', icon: <Smartphone size={14} />, bg: 'rgba(220,38,38,0.08)', color: '#b91c1c', border: 'rgba(220,38,38,0.25)' };
+    case 'AIRTELTIGO_MONEY':
+      return { label: 'AirtelTigo Money', icon: <Smartphone size={14} />, bg: 'rgba(37,99,235,0.08)', color: '#1d4ed8', border: 'rgba(37,99,235,0.25)' };
+    case 'CARD':
+      return { label: 'Card', icon: <CreditCard size={14} />, bg: 'rgba(109,40,217,0.08)', color: '#6d28d9', border: 'rgba(109,40,217,0.25)' };
+    case 'SPLIT':
+      return { label: 'Split payment', icon: <SplitSquareHorizontal size={14} />, bg: 'rgba(0,109,119,0.08)', color: 'var(--color-teal-dark)', border: 'rgba(0,109,119,0.25)' };
+    default: // CASH
+      return { label: 'Cash', icon: <Banknote size={14} />, bg: 'rgba(21,128,61,0.08)', color: '#15803d', border: 'rgba(21,128,61,0.25)' };
   }
 }
 
@@ -367,6 +396,52 @@ export default function SaleDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Payment method card */}
+            {sale.tenders && sale.tenders.length > 0 && (
+              <div
+                className="rounded-xl p-4 sm:col-span-2 lg:col-span-1"
+                style={{
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--surface-border)',
+                  boxShadow: 'var(--shadow-card)',
+                }}
+              >
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
+                  <Banknote size={14} aria-hidden />
+                  Payment
+                </div>
+                <div className="space-y-2">
+                  {sale.tenders.map((tender, i) => {
+                    const meta = tenderMeta(tender.method);
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-2">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                          style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}
+                        >
+                          {meta.icon}
+                          {meta.label}
+                        </span>
+                        <span className="font-mono text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {tender.amountFormatted}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {/* MoMo reference if present */}
+                  {sale.tenders.some(t => t.momoReference) && (
+                    <div className="mt-1 pt-1" style={{ borderTop: '1px solid var(--surface-border)' }}>
+                      {sale.tenders.filter(t => t.momoReference).map((t, i) => (
+                        <p key={i} className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Ref: {t.momoReference}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div

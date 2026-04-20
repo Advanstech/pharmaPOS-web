@@ -49,11 +49,13 @@ export default function ReportsPage() {
   const hourlySales = (data?.hourlySales ?? []) as any[];
   const categories = (data?.categoryBreakdown ?? []) as any[];
   const staff = (data?.staffPerformance ?? []) as any[];
+  const paymentMethods = (data?.paymentMethodBreakdown ?? []) as any[];
 
   const revDelta = pctChange(curr?.totalRevenuePesewas ?? 0, prev?.totalRevenuePesewas ?? 0);
   const salesDelta = pctChange(curr?.salesCount ?? 0, prev?.salesCount ?? 0);
   const maxHourlySales = Math.max(...hourlySales.map((h: any) => h.salesCount), 1);
   const totalCatRevenue = categories.reduce((s: number, c: any) => s + c.revenuePesewas, 0);
+  const totalPaymentRevenue = paymentMethods.reduce((s: number, p: any) => s + p.totalPesewas, 0);
 
   return (
     <div style={{ background: 'var(--surface-base)', minHeight: '100vh' }}>
@@ -70,7 +72,7 @@ export default function ReportsPage() {
               <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-secondary)' }}>
                 <Printer size={13} /> Print
               </button>
-              <Link href="/dashboard/cfo-briefing" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}>
+              <Link href="/dashboard/cfo" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}>
                 <Zap size={13} /> CFO Briefing
               </Link>
             </div>
@@ -225,6 +227,53 @@ export default function ReportsPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Payment Method Breakdown ── */}
+          {paymentMethods.length > 0 && (
+            <div className="rounded-2xl p-4" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+              <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>
+                💳 Payment Method Breakdown
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {paymentMethods.map((p: any) => {
+                  const pct = totalPaymentRevenue > 0 ? Math.round((p.totalPesewas / totalPaymentRevenue) * 100) : 0;
+                  const methodColors: Record<string, { bg: string; color: string; border: string }> = {
+                    CASH: { bg: 'rgba(21,128,61,0.08)', color: '#15803d', border: 'rgba(21,128,61,0.2)' },
+                    MTN_MOMO: { bg: 'rgba(255,204,0,0.12)', color: '#92400e', border: 'rgba(255,204,0,0.4)' },
+                    VODAFONE_CASH: { bg: 'rgba(220,38,38,0.08)', color: '#b91c1c', border: 'rgba(220,38,38,0.2)' },
+                    AIRTELTIGO_MONEY: { bg: 'rgba(37,99,235,0.08)', color: '#1d4ed8', border: 'rgba(37,99,235,0.2)' },
+                    CARD: { bg: 'rgba(109,40,217,0.08)', color: '#6d28d9', border: 'rgba(109,40,217,0.2)' },
+                    SPLIT: { bg: 'rgba(0,109,119,0.08)', color: '#0d9488', border: 'rgba(0,109,119,0.2)' },
+                  };
+                  const methodLabels: Record<string, string> = {
+                    CASH: '💵 Cash', MTN_MOMO: '📱 MTN MoMo', VODAFONE_CASH: '📱 Vodafone Cash',
+                    AIRTELTIGO_MONEY: '📱 AirtelTigo', CARD: '💳 Card', SPLIT: '🔀 Split',
+                  };
+                  const style = methodColors[p.method] ?? { bg: 'var(--surface-base)', color: 'var(--text-primary)', border: 'var(--surface-border)' };
+                  return (
+                    <div key={p.method} className="rounded-xl p-3" style={{ background: style.bg, border: `1px solid ${style.border}` }}>
+                      <p className="text-xs font-bold mb-1" style={{ color: style.color }}>
+                        {methodLabels[p.method] ?? p.method}
+                      </p>
+                      <p className="text-lg font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
+                        {p.totalFormatted}
+                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{p.count} sales</p>
+                        <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5" style={{ background: style.bg, color: style.color }}>
+                          {pct}%
+                        </span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.08)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: style.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Top Products ── */}
           <div className="rounded-2xl p-4" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>

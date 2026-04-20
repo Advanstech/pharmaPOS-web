@@ -8,9 +8,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import {
-  LIST_STOCK_TRANSFERS, CREATE_STOCK_TRANSFER,
+  LIST_STOCK_TRANSFERS, CREATE_STOCK_TRANSFER, BRANCHES_QUERY,
   APPROVE_STOCK_TRANSFER, RECEIVE_STOCK_TRANSFER, CANCEL_STOCK_TRANSFER,
 } from '@/lib/graphql/stock-transfers';
+import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { SmartTextarea } from '@/components/ui/smart-textarea';
 
@@ -247,108 +248,225 @@ function CreateTransferModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<Array<{ productId: string; productName: string; quantity: number }>>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  // Get inventory for product selection
-  const { data: invData } = useQuery(
-    require('@/lib/graphql/accounting.queries').LIST_EXPENSES, // placeholder - we'll use inventory query
-    { skip: true },
-  );
+  // Fetch all org branches dynamically — filter out current user's branch
+  const { data: branchData } = useQuery(BRANCHES_QUERY, { fetchPolicy: 'cache-and-network' });
+  const branches = ((branchData?.branches ?? []) as Array<{ id: string; name: string; type: string }>)
+    .filter(b => b.id !== user?.branch_id);
 
-  // Branch options (hardcoded for now — 2 branches)
-  const branches = [
-    { id: '70d101ec-45c3-416b-a8e4-48946d5cef8e', name: 'Azzay Pharmacy \u2014 Main Branch' },
-    { id: '32651a76-3505-4ee8-a44a-203437f9ef38', name: 'Azzay Chemical Shop \u2014 Spintex' },
-  ].filter(b => b.id !== user?.branch_id);
+  // Product search using the existing SearchProducts query
+  const { data: searchData, loading: searchLoading } = useQuery(SEARCH_PRODUCTS_QUERY, {
+    variables: { query: searchQuery, branchId: user?.branch_id ?? '', limit: 8 },
+    skip: searchQuery.trim().length < 2,
+    fetchPolicy: 'cache-and-network',
+  });
+  const searchResults = (searchData?.searchProducts ?? []) as Array<{
+    id: string; name: string; genericName: string | null;
+    inventory: { quantityOnHand: number } | null;
+  }>;
 
   const [createMutation, { loading }] = useMutation(CREATE_STOCK_TRANSFER);
 
   const addItem = (productId: string, productName: string) => {
     if (items.find(i => i.productId === productId)) return;
-    setItems([...items, { productId, productName, quantity: 1 }]);
+    setItems(prev => [...prev, { productId, productName, quantity: 1 }]);
     setSearchQuery('');
   };
 
   const updateQty = (productId: string, qty: number) => {
-    setItems(items.map(i => i.productId === productId ? { ...i, quantity: Math.max(1, qty) } : i));
+    setItems(prev => prev.map(i => i.productId === productId ? { ...i, quantity: Math.max(1, qty) } : i));
   };
 
   const removeItem = (productId: string) => {
-    setItems(items.filter(i => i.productId !== productId));
+    setItems(prev => prev.filter(i => i.productId !== productId));
   };
 
   const handleSubmit = async () => {
-    if (!toBranchId || items.length === 0) return;
+    setError(null);
+    if (!toBranchId) { setError('Select a destination branch'); return; }
+    if (items.length === 0) { setError('Add at least one product'); return; }
     try {
       await createMutation({
         variables: {
           input: {
             toBranchId,
             items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
-            notes: notes || undefined,
+            notes: notes.trim() || undefined,
           },
         },
       });
       onCreated();
     } catch (e: any) {
-      alert(e?.message || 'Failed to create transfer');
+      setError(e?.message || 'Failed to create transfer');
     }
   };
+
+  const selectedBranchName = branches.find(b => b.id === toBranchId)?.name;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        {/* Header */}
         <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(13,148,136,0.04)' }}>
-          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>New Stock Transfer</h2>
+          <div>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>New Stock Transfer</h2>
+            {user?.branchName && (
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                From: <span className="font-semibold" style={{ color: 'var(--color-teal-dark)' }}>{user.branchName}</span>
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Cancel</button>
         </div>
 
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Destination */}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Destination branch */}
           <div>
-            <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Transfer To</label>
-            <select value={toBranchId} onChange={e => setToBranchId(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm"
-              style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}>
-              <option value="">Select destination branch</option>
-              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Transfer To
+            </label>
+            {branches.length === 0 ? (
+              <div className="rounded-lg px-3 py-2.5 text-xs" style={{ background: 'rgba(180,83,9,0.06)', border: '1px solid rgba(180,83,9,0.2)', color: '#b45309' }}>
+                No other branches found in your organisation.
+              </div>
+            ) : (
+              <select
+                value={toBranchId}
+                onChange={e => setToBranchId(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+              >
+                <option value="">Select destination branch</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} {b.type === 'chemical' ? '🧪' : '💊'}
+                  </option>
+                ))}
+              </select>
+            )}
+            {toBranchId && selectedBranchName && (
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                ✓ Sending to <strong>{selectedBranchName}</strong>
+              </p>
+            )}
           </div>
 
-          {/* Items */}
+          {/* Product search */}
           <div>
-            <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Products to Transfer</label>
-            {items.map(item => (
-              <div key={item.productId} className="flex items-center gap-2 mb-2 rounded-lg px-3 py-2" style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
-                <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.productName}</span>
-                <input type="number" min={1} value={item.quantity} onChange={e => updateQty(item.productId, parseInt(e.target.value) || 1)}
-                  className="w-16 rounded border px-2 py-1 text-xs text-center font-mono"
-                  style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
-                <button onClick={() => removeItem(item.productId)} className="text-xs" style={{ color: '#dc2626' }}>Remove</button>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Products to Transfer
+            </label>
+
+            {/* Added items */}
+            {items.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {items.map(item => (
+                  <div key={item.productId} className="flex items-center gap-2 rounded-lg px-3 py-2"
+                    style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+                    <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      {item.productName}
+                    </span>
+                    <input
+                      type="number" min={1} value={item.quantity}
+                      onChange={e => updateQty(item.productId, parseInt(e.target.value) || 1)}
+                      className="w-16 rounded border px-2 py-1 text-xs text-center font-mono"
+                      style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                    />
+                    <button onClick={() => removeItem(item.productId)}
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ color: '#dc2626', background: 'rgba(220,38,38,0.08)' }}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {items.length} product{items.length !== 1 ? 's' : ''} · {items.reduce((s, i) => s + i.quantity, 0)} total units
+                </p>
               </div>
-            ))}
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-              {items.length === 0 ? 'Search and add products below' : items.length + ' products, ' + items.reduce((s, i) => s + i.quantity, 0) + ' total units'}
-            </p>
+            )}
+
+            {/* Search input */}
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search products to add…"
+                className="w-full rounded-lg border pl-8 pr-3 py-2 text-xs"
+                style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+              />
+            </div>
+
+            {/* Search results dropdown */}
+            {searchQuery.trim().length >= 2 && (
+              <div className="mt-1 rounded-lg overflow-hidden" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)' }}>
+                {searchLoading && (
+                  <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>Searching…</p>
+                )}
+                {!searchLoading && searchResults.length === 0 && (
+                  <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>No products found</p>
+                )}
+                {searchResults.map(p => {
+                  const alreadyAdded = items.some(i => i.productId === p.id);
+                  const stock = p.inventory?.quantityOnHand ?? 0;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => !alreadyAdded && addItem(p.id, p.name)}
+                      disabled={alreadyAdded || stock === 0}
+                      className="w-full flex items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                      style={{ borderTop: '1px solid var(--surface-border)' }}
+                    >
+                      <div>
+                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{p.name}</span>
+                        {p.genericName && <span className="ml-1" style={{ color: 'var(--text-muted)' }}>({p.genericName})</span>}
+                      </div>
+                      <span className="ml-2 shrink-0 font-mono text-[10px]"
+                        style={{ color: stock === 0 ? '#dc2626' : stock <= 5 ? '#b45309' : '#15803d' }}>
+                        {alreadyAdded ? '✓ Added' : stock === 0 ? 'Out of stock' : `${stock} in stock`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Notes */}
           <div>
             <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes (optional)</label>
-            <SmartTextarea value={notes} onChange={setNotes} rows={2}
+            <SmartTextarea
+              value={notes}
+              onChange={setNotes}
+              rows={2}
               context="transfer:notes"
-              placeholder="Reason for transfer..."
+              placeholder="Reason for transfer…"
               className="w-full rounded-lg border border-surface-border px-3 py-2 text-sm bg-[var(--surface-base)] text-[var(--text-primary)]"
             />
           </div>
         </div>
 
+        {/* Footer */}
         <div className="px-5 py-3 flex justify-end gap-2" style={{ borderTop: '1px solid var(--surface-border)' }}>
           <button onClick={onClose} className="rounded-lg border px-4 py-2 text-xs font-semibold"
-            style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Cancel</button>
-          <button onClick={handleSubmit} disabled={loading || !toBranchId || items.length === 0}
+            style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={loading || !toBranchId || items.length === 0}
             className="rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-            style={{ background: '#0d9488' }}>
-            {loading ? 'Creating...' : 'Create Transfer'}
+            style={{ background: '#0d9488' }}
+          >
+            {loading ? 'Creating…' : 'Create Transfer'}
           </button>
         </div>
       </div>

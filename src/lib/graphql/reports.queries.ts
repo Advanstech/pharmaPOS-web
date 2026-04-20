@@ -23,5 +23,8 @@ export const REPORTS_DASHBOARD = gql`
     staffPerformance(periodStart: $periodStart, periodEnd: $periodEnd) {
       staffId staffName salesCount revenuePesewas revenueFormatted averageSaleGhs
     }
+    paymentMethodBreakdown(periodStart: $periodStart, periodEnd: $periodEnd) {
+      method count totalPesewas totalFormatted
+    }
   }
 `;

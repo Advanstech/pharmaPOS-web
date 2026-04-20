@@ -48,6 +48,12 @@ export const SALE_DETAIL = gql`
       idempotencyKey
       soldAt
       createdAt
+      tenders {
+        method
+        amountPesewas
+        amountFormatted
+        momoReference
+      }
       items {
         id
         productId
