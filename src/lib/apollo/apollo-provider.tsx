@@ -130,7 +130,7 @@ function makeClient(getToken: () => string | null): ApolloClient<NormalizedCache
         errorPolicy: 'all',
       },
       query: {
-        fetchPolicy: 'network-only', // Always fetch fresh data for now
+        fetchPolicy: 'cache-first',
         errorPolicy: 'all',
       },
       mutate: {

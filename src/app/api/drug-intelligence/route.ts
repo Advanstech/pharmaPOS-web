@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server';
+import { hasRequiredRole, verifyBearerJwt } from '@/lib/security/jwt-auth';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
+import { fetchOpenAiWithTimeout } from '@/lib/security/openai-timeout';
+import { recordAiMetric } from '@/lib/security/ai-metrics';
 
 export const runtime = 'nodejs';
+const WINDOW_MS = 60_000;
+const MAX_REQUESTS_PER_WINDOW = 60;
+const ROUTE_KEY = 'drug-intelligence';
+const ALLOWED_ROLES = [
+  'owner',
+  'se_admin',
+  'manager',
+  'head_pharmacist',
+  'pharmacist',
+  'technician',
+  'cashier',
+  'chemical_cashier',
+] as const;
 
 // Simple in-memory cache (edge-safe alternative: use Redis via API)
 const cache = new Map<string, { data: DrugIntelligence; ts: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+const MAX_CACHE_ENTRIES = 1000;
 
 export interface DrugIntelligence {
   name: string;
@@ -46,6 +64,22 @@ For Ghana context: reference NHIS coverage, Ghana FDA classification, local bran
 Never recommend specific doses without noting "consult prescriber for individual dosing".
 Always include a disclaimer that this is for staff education only, not patient advice.`;
 
+function pruneCache(now: number): void {
+  for (const [key, value] of cache.entries()) {
+    if (now - value.ts >= CACHE_TTL) {
+      cache.delete(key);
+    }
+  }
+  if (cache.size <= MAX_CACHE_ENTRIES) return;
+  const oldestKeys = [...cache.entries()]
+    .sort((a, b) => a[1].ts - b[1].ts)
+    .slice(0, cache.size - MAX_CACHE_ENTRIES)
+    .map(([key]) => key);
+  for (const key of oldestKeys) {
+    cache.delete(key);
+  }
+}
+
 function buildPrompt(name: string, genericName: string, classification: string): string {
   return `Provide drug intelligence for: "${name}" (generic: "${genericName || name}", classification: "${classification}").
 
@@ -82,6 +116,25 @@ Return ONLY valid JSON with this exact structure:
 
 export async function POST(request: Request) {
   try {
+    recordAiMetric(ROUTE_KEY, 'requests_total');
+    const auth = await verifyBearerJwt(request);
+    if (!auth.ok) {
+      recordAiMetric(ROUTE_KEY, 'auth_denied');
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    if (!hasRequiredRole(auth.payload, ALLOWED_ROLES)) {
+      recordAiMetric(ROUTE_KEY, 'role_denied');
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const limited = await enforceRateLimit(request, ROUTE_KEY, MAX_REQUESTS_PER_WINDOW, WINDOW_MS);
+    if (!limited.allowed) {
+      recordAiMetric(ROUTE_KEY, 'rate_limited');
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfterSeconds ?? 60) } },
+      );
+    }
+
     const body = await request.json() as { name?: string; genericName?: string; classification?: string };
     const name = (body.name ?? '').trim();
     const genericName = (body.genericName ?? '').trim();
@@ -92,6 +145,7 @@ export async function POST(request: Request) {
     }
 
     const cacheKey = `${name.toLowerCase()}::${genericName.toLowerCase()}`;
+    pruneCache(Date.now());
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       return NextResponse.json(cached.data, {
@@ -107,13 +161,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const response = await fetchOpenAiWithTimeout(apiKey, {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -122,10 +170,10 @@ export async function POST(request: Request) {
         temperature: 0.2,
         max_tokens: 1200,
         response_format: { type: 'json_object' },
-      }),
     });
 
     if (!response.ok) {
+      recordAiMetric(ROUTE_KEY, 'openai_error');
       const err = await response.text();
       console.error('[drug-intelligence] OpenAI error:', err);
       return NextResponse.json(buildFallback(name, genericName, classification), {
@@ -133,6 +181,7 @@ export async function POST(request: Request) {
       });
     }
 
+    recordAiMetric(ROUTE_KEY, 'openai_success');
     const json = await response.json() as { choices: Array<{ message: { content: string } }> };
     const content = json.choices?.[0]?.message?.content ?? '{}';
     const data = JSON.parse(content) as DrugIntelligence;
@@ -143,6 +192,11 @@ export async function POST(request: Request) {
       headers: { 'X-Cache': 'MISS', 'Cache-Control': 'public, s-maxage=86400' },
     });
   } catch (err) {
+    if (err instanceof Error && err.message === 'OPENAI_TIMEOUT') {
+      recordAiMetric(ROUTE_KEY, 'openai_timeout');
+      return NextResponse.json({ error: 'Upstream AI timeout' }, { status: 504 });
+    }
+    recordAiMetric(ROUTE_KEY, 'server_error');
     console.error('[drug-intelligence] Error:', err);
     return NextResponse.json({ error: 'Failed to fetch drug intelligence' }, { status: 500 });
   }

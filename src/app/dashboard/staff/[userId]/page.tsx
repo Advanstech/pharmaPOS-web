@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useQuery } from '@apollo/client';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Wifi, WifiOff, Briefcase, Building2, Calendar, BadgeCheck,
@@ -59,6 +60,8 @@ function avatarGradient(name: string): string {
 export default function StaffDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const user = useAuthStore(s => s.user);
+  const ACTIVITY_PAGE_SIZE = 15;
+  const [activityPage, setActivityPage] = useState(1);
 
   const { data, loading, error } = useQuery(STAFF_MEMBER, {
     variables: { userId },
@@ -66,12 +69,13 @@ export default function StaffDetailPage() {
   });
 
   const { data: actData } = useQuery(STAFF_ACTIVITY_LOG, {
-    variables: { userId, limit: 30 },
+    variables: { userId, limit: ACTIVITY_PAGE_SIZE, offset: (activityPage - 1) * ACTIVITY_PAGE_SIZE },
     fetchPolicy: 'cache-and-network',
   });
 
   const member = data?.staffMember;
   const activities = actData?.staffActivityLog ?? [];
+  const hasMoreActivity = activities.length === ACTIVITY_PAGE_SIZE;
   const rc = ROLE_COLORS[member?.role] ?? ROLE_COLORS.cashier;
 
   if (loading && !member) {
@@ -194,29 +198,56 @@ export default function StaffDetailPage() {
             {activities.length === 0 ? (
               <p className="py-6 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No activity recorded yet</p>
             ) : (
-              <div className="space-y-0 divide-y" style={{ borderColor: 'var(--surface-border)' }}>
-                {activities.map((a: any) => {
-                  const info = ACTIVITY_LABELS[a.type] ?? { label: a.type.replace(/_/g, ' '), color: '#64748b', icon: '📋' };
-                  return (
-                    <div key={a.id} className="flex items-start gap-2.5 py-3">
-                      <span className="mt-0.5 text-sm">{info.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold" style={{ color: info.color }}>{info.label}</span>
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            {new Date(a.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', timeStyle: 'short', dateStyle: 'short' })}
-                          </span>
+              <>
+                <div className="space-y-0 divide-y" style={{ borderColor: 'var(--surface-border)' }}>
+                  {activities.map((a: any) => {
+                    const info = ACTIVITY_LABELS[a.type] ?? { label: a.type.replace(/_/g, ' '), color: '#64748b', icon: '📋' };
+                    return (
+                      <div key={a.id} className="flex items-start gap-2.5 py-3">
+                        <span className="mt-0.5 text-sm">{info.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold" style={{ color: info.color }}>{info.label}</span>
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {new Date(a.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', timeStyle: 'short', dateStyle: 'short' })}
+                            </span>
+                          </div>
+                          {a.operation && (
+                            <p className="mt-0.5 text-[11px] leading-tight" style={{ color: 'var(--text-secondary)' }}>
+                              {a.operation}
+                            </p>
+                          )}
                         </div>
-                        {a.operation && (
-                          <p className="mt-0.5 text-[11px] leading-tight" style={{ color: 'var(--text-secondary)' }}>
-                            {a.operation}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Page {activityPage}{hasMoreActivity ? ' - more available' : ''}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={activityPage <= 1}
+                      onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                      className="rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40"
+                      style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasMoreActivity}
+                      onClick={() => setActivityPage((p) => p + 1)}
+                      className="rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40"
+                      style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

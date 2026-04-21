@@ -1,6 +1,23 @@
 import { NextResponse } from 'next/server';
+import { hasRequiredRole, verifyBearerJwt } from '@/lib/security/jwt-auth';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
+import { fetchOpenAiWithTimeout } from '@/lib/security/openai-timeout';
+import { recordAiMetric } from '@/lib/security/ai-metrics';
 
 export const runtime = 'nodejs';
+const WINDOW_MS = 60_000;
+const MAX_REQUESTS_PER_WINDOW = 30;
+const ROUTE_KEY = 'ai-copilot';
+const ALLOWED_ROLES = [
+  'owner',
+  'se_admin',
+  'manager',
+  'head_pharmacist',
+  'pharmacist',
+  'technician',
+  'cashier',
+  'chemical_cashier',
+] as const;
 
 const SYSTEM_PROMPT = `You are PharmaPOS Pro's AI Copilot — an intelligent pharmacy assistant for a Ghana community pharmacy.
 
@@ -30,6 +47,28 @@ interface HistoryMessage {
 
 export async function POST(request: Request) {
   try {
+    recordAiMetric(ROUTE_KEY, 'requests_total');
+    const auth = await verifyBearerJwt(request);
+    if (!auth.ok) {
+      recordAiMetric(ROUTE_KEY, 'auth_denied');
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    if (!hasRequiredRole(auth.payload, ALLOWED_ROLES)) {
+      recordAiMetric(ROUTE_KEY, 'role_denied');
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const limited = await enforceRateLimit(request, ROUTE_KEY, MAX_REQUESTS_PER_WINDOW, WINDOW_MS);
+    if (!limited.allowed) {
+      recordAiMetric(ROUTE_KEY, 'rate_limited');
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(limited.retryAfterSeconds ?? 60) },
+        },
+      );
+    }
+
     const body = await request.json() as {
       message: string;
       role?: string;
@@ -57,21 +96,15 @@ export async function POST(request: Request) {
       { role: 'user', content: message },
     ];
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const response = await fetchOpenAiWithTimeout(apiKey, {
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.4,
         max_tokens: 400,
-      }),
     });
 
     if (!response.ok) {
+      recordAiMetric(ROUTE_KEY, 'openai_error');
       const err = await response.text();
       console.error('[ai-copilot] OpenAI error:', err);
       return NextResponse.json({
@@ -79,11 +112,17 @@ export async function POST(request: Request) {
       });
     }
 
+    recordAiMetric(ROUTE_KEY, 'openai_success');
     const json = await response.json() as { choices: Array<{ message: { content: string } }> };
     const reply = json.choices?.[0]?.message?.content ?? 'I could not generate a response. Please try again.';
 
     return NextResponse.json({ reply });
   } catch (err) {
+    if (err instanceof Error && err.message === 'OPENAI_TIMEOUT') {
+      recordAiMetric(ROUTE_KEY, 'openai_timeout');
+      return NextResponse.json({ error: 'Upstream AI timeout' }, { status: 504 });
+    }
+    recordAiMetric(ROUTE_KEY, 'server_error');
     console.error('[ai-copilot] Error:', err);
     return NextResponse.json({ error: 'Copilot request failed' }, { status: 500 });
   }

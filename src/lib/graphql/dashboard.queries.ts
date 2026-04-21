@@ -138,8 +138,8 @@ export const STAFF_SESSION_HISTORY = gql`
 
 
 export const STAFF_ACTIVITY_LOG = gql`
-  query StaffActivityLog($userId: ID!, $limit: Int) {
-    staffActivityLog(userId: $userId, limit: $limit) {
+  query StaffActivityLog($userId: ID!, $limit: Int, $offset: Int) {
+    staffActivityLog(userId: $userId, limit: $limit, offset: $offset) {
       id
       type
       operation

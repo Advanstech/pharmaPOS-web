@@ -1373,12 +1373,20 @@ const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function StaffActivitySection({ userId }: { userId: string }) {
+  const pageSize = 12;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [userId]);
+
   const { data, loading } = useQuery(STAFF_ACTIVITY_LOG, {
-    variables: { userId, limit: 20 },
+    variables: { userId, limit: pageSize, offset: (page - 1) * pageSize },
     fetchPolicy: 'cache-and-network',
   });
 
   const activities = data?.staffActivityLog ?? [];
+  const hasNext = activities.length === pageSize;
 
   return (
     <Section title="Recent Activity" icon={Activity}>
@@ -1387,36 +1395,63 @@ function StaffActivitySection({ userId }: { userId: string }) {
       ) : activities.length === 0 ? (
         <div className="px-3 py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No activity recorded yet</div>
       ) : (
-        <div className="max-h-48 overflow-y-auto">
-          {activities.map((a: any) => {
-            const info = ACTIVITY_LABELS[a.type] ?? { label: a.type, color: '#64748b' };
-            return (
-              <div key={a.id} className="flex items-center justify-between px-3 py-2 gap-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: info.color }} />
-                  <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {info.label}
-                  </span>
-                  {a.operation && a.type === 'STAFF_ACTIVITY' && (
-                    <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
-                      {a.operation}
+        <>
+          <div className="max-h-48 overflow-y-auto">
+            {activities.map((a: any) => {
+              const info = ACTIVITY_LABELS[a.type] ?? { label: a.type, color: '#64748b' };
+              return (
+                <div key={a.id} className="flex items-center justify-between px-3 py-2 gap-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: info.color }} />
+                    <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      {info.label}
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {a.durationMs && (
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                      {a.durationMs}ms
+                    {a.operation && a.type === 'STAFF_ACTIVITY' && (
+                      <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                        {a.operation}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {a.durationMs && (
+                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                        {a.durationMs}ms
+                      </span>
+                    )}
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {new Date(a.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', timeStyle: 'short', dateStyle: 'short' })}
                     </span>
-                  )}
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    {new Date(a.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', timeStyle: 'short', dateStyle: 'short' })}
-                  </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              Page {page}{hasNext ? ' · more available' : ''}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={!hasNext}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-md border px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </Section>
   );
