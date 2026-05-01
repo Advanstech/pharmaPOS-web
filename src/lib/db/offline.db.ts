@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { OfflineProduct, OfflineSale } from '@/types';
 
 /**
- * PharmaPOS offline IndexedDB via Dexie.js
+ * Azzay Pharmacy offline IndexedDB via Dexie.js
  * - products: cached catalogue (7-day TTL, warmed on login)
  * - pendingSales: queued transactions when offline (synced on reconnect)
  */

@@ -40,8 +40,8 @@ export function PosTopBar() {
       className="flex flex-wrap items-center justify-between gap-y-2 px-3 sm:px-5 py-1.5 min-h-14 shrink-0"
       style={{
         background:
-          'linear-gradient(135deg, #004D55 0%, #006D77 48%, #0d9488 100%)',
-        boxShadow: '0 2px 12px rgba(0,78,87,0.5)',
+          'linear-gradient(135deg, #06392F 0%, #064E3B 48%, #047857 100%)',
+        boxShadow: '0 2px 12px rgba(6, 78, 59, 0.5)',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
       }}
     >
@@ -54,11 +54,11 @@ export function PosTopBar() {
             title="Marketing home"
             aria-label="Go to marketing home"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/25 bg-black/20">
-              <Stethoscope size={14} className="text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/25 bg-white p-0.5 overflow-hidden">
+              <img src="/logo.png" alt="Azzay Pharmacy" className="w-full h-full object-contain" />
             </div>
             <span className="text-sm font-bold tracking-wide text-white underline-offset-2 hover:underline" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}>
-              PharmaPOS Pro
+              Azzay Pharmacy <span className="font-normal opacity-80 text-emerald-100">Pro</span>
             </span>
           </Link>
         </div>

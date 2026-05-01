@@ -6,6 +6,7 @@ import {
   BrainCircuit, X, Send, Sparkles, Loader2,
   TrendingUp, Pill, Package, DollarSign, AlertTriangle,
 } from 'lucide-react';
+import { aiFetch } from '@/lib/ai/fetch-with-auth';
 import { useAuthStore } from '@/lib/store/auth.store';
 
 interface Message {
@@ -63,7 +64,7 @@ export function PharmaCopilot() {
       const greeting: Message = {
         id: 'greeting',
         role: 'assistant',
-        content: `Hello ${user?.name?.split(' ')[0] ?? 'there'}! 👋 I'm your PharmaPOS AI Copilot. I can help you with drug information, clinical guidance, inventory intelligence, and more. What would you like to know?`,
+        content: `Hello ${user?.name?.split(' ')[0] ?? 'there'}! 👋 I'm your Azzay Pharmacy AI Copilot. I can help you with drug information, clinical guidance, inventory intelligence, and more. What would you like to know?`,
         ts: Date.now(),
       };
       setMessages([greeting]);
@@ -86,15 +87,10 @@ export function PharmaCopilot() {
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_OPENAI_KEY;
-      // Use the drug intelligence API as a proxy for the copilot
-      const res = await fetch('/api/ai-copilot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text.trim(),
-          role,
-          history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-        }),
+      const res = await aiFetch('/api/ai-copilot', {
+        message: text.trim(),
+        role,
+        history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
       });
 
       let reply = '';

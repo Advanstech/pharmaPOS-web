@@ -1,7 +1,9 @@
-import Redis from 'ioredis';
-
 const inMemoryStore = new Map<string, { count: number; resetAt: number }>();
-let redisClient: Redis | null = null;
+
+// Lazy Redis import — only used if REDIS_URL is set and ioredis is available
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let redisClient: any = null;
+let redisAttempted = false;
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -9,16 +11,23 @@ function getClientIp(request: Request): string {
   return request.headers.get('x-real-ip') || 'unknown';
 }
 
-function getRedisClient(): Redis | null {
-  if (redisClient) return redisClient;
+async function getRedisClient(): Promise<any> {
+  if (redisAttempted) return redisClient;
+  redisAttempted = true;
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) return null;
-  redisClient = new Redis(redisUrl, {
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
-    lazyConnect: true,
-  });
-  return redisClient;
+  try {
+    const { default: Redis } = await import('ioredis');
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      lazyConnect: true,
+    });
+    return redisClient;
+  } catch {
+    // ioredis not available in this environment
+    return null;
+  }
 }
 
 export async function enforceRateLimit(
@@ -31,7 +40,7 @@ export async function enforceRateLimit(
   const ip = getClientIp(request);
   const key = `rl:${routeKey}:${ip}`;
 
-  const redis = getRedisClient();
+  const redis = await getRedisClient();
   if (redis) {
     try {
       if (redis.status === 'wait') {

@@ -2,19 +2,33 @@
 
 import { useState } from 'react';
 import { useQuery } from '@apollo/client';
-import { gql } from '@apollo/client';
 import { Building2, ChevronDown, Check } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { BRANCHES_QUERY } from '@/lib/graphql/branches';
 
-const BRANCHES_QUERY = gql`
-  query Branches {
-    branches {
-      id
-      name
-      type
-    }
+type BranchOption = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+function dedupeBranches(branches: BranchOption[], currentBranchId?: string): BranchOption[] {
+  const grouped = new Map<string, BranchOption[]>();
+  for (const branch of branches) {
+    const key = `${branch.name.trim().toLowerCase()}::${branch.type.trim().toLowerCase()}`;
+    const list = grouped.get(key) ?? [];
+    list.push(branch);
+    grouped.set(key, list);
   }
-`;
+
+  const deduped: BranchOption[] = [];
+  for (const list of grouped.values()) {
+    const active = list.find((b) => b.id === currentBranchId);
+    deduped.push(active ?? list[0]);
+  }
+
+  return deduped.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export function BranchSwitcher() {
   const { user, setAuth, accessToken, refreshToken } = useAuthStore();
@@ -27,7 +41,8 @@ export function BranchSwitcher() {
     fetchPolicy: 'cache-first',
   });
 
-  const branches = data?.branches ?? [];
+  const rawBranches = (data?.branches ?? []) as BranchOption[];
+  const branches = dedupeBranches(rawBranches, user?.branch_id);
 
   if (!canSwitch || branches.length <= 1) return null;
 

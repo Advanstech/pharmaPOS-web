@@ -40,7 +40,7 @@ export function MobileTopBar() {
             <div className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ background: 'var(--color-teal)' }}>
               <Stethoscope size={12} className="text-white" />
             </div>
-            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>PharmaPOS</span>
+            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Azzay Pharmacy</span>
           </div>
         </div>
         <Link href="/pos" className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white" style={{ background: 'var(--color-teal)' }}>
@@ -62,7 +62,7 @@ export function MobileTopBar() {
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'var(--color-teal)' }}>
                   <Stethoscope size={14} className="text-white" />
                 </div>
-                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>PharmaPOS Pro</span>
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Azzay Pharmacy Pro</span>
               </div>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-[rgba(0,0,0,0.05)]" aria-label="Close menu">
                 <X size={18} style={{ color: 'var(--text-muted)' }} />

@@ -1,4 +1,4 @@
-# PharmaPOS Pro — Web
+# Azzay Pharmacy Pro — Web
 
 Next.js 16 PWA frontend. Runs on port 3000.
 
@@ -29,13 +29,13 @@ Same accounts as the API seed. Use these to log in at `/login`:
 | Role | Email | Password |
 |------|-------|----------|
 | se_admin (ROOT) | root@advansis.io | AdvansisMaster#1 |
-| owner | owner@azzaypharmacy.com | PharmaPOS@2025! |
-| manager | manager@azzaypharmacy.com | PharmaPOS@2025! |
-| head_pharmacist | head.pharmacist@azzaypharmacy.com | PharmaPOS@2025! |
-| pharmacist | pharmacist@azzaypharmacy.com | PharmaPOS@2025! |
-| technician | technician@azzaypharmacy.com | PharmaPOS@2025! |
-| cashier | cashier@azzaypharmacy.com | PharmaPOS@2025! |
-| chemical_cashier | chemical.cashier@azzaypharmacy.com | PharmaPOS@2025! |
+| owner | owner@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| manager | manager@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| head_pharmacist | head.pharmacist@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| pharmacist | pharmacist@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| technician | technician@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| cashier | cashier@azzaypharmacy.com | Azzay Pharmacy@2025! |
+| chemical_cashier | chemical.cashier@azzaypharmacy.com | Azzay Pharmacy@2025! |
 
 > API must be running and seeded first — see `apps/api/README.md`
 

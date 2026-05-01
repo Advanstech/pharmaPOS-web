@@ -86,7 +86,7 @@ export function printPosReceiptFromElement(printArea: HTMLElement): void {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PharmaPOS — Receipt</title>
+  <title>Azzay Pharmacy — Receipt</title>
   <style>${receiptDocumentStyles()}</style>
 </head>
 <body>

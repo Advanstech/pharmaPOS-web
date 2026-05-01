@@ -60,7 +60,7 @@ function buildPrintDocumentHtml(title: string, subtitle: string, bodyHtml: strin
     <div class="wrap">
       <header class="brand">
         <div>
-          <h1>PharmaPOS Pro · ${esc(title)}</h1>
+          <h1>Azzay Pharmacy Pro · ${esc(title)}</h1>
           <p>${esc(subtitle)}</p>
         </div>
         <span class="chip">Decision Brief</span>

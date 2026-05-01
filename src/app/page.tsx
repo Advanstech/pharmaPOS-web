@@ -11,40 +11,14 @@ import { GhsMoney } from '@/components/ui/ghs-money';
 import { PharmaNewsTicker } from '@/components/marketing/pharma-news-ticker';
 
 function HeroBackground() {
-  const prefersReduced = useReducedMotion();
-  
-  if (prefersReduced) return null;
-
-  const icons = [
-    { Icon: Pill, color: 'var(--color-teal)', size: 48, initial: { x: -250, y: -100 }, animate: { y: [-100, -130, -100], rotate: [0, 15, -15, 0] }, delay: 0 },
-    { Icon: FlaskConical, color: 'var(--color-gold)', size: 64, initial: { x: 300, y: -150 }, animate: { y: [-150, -180, -150], rotate: [0, -10, 10, 0] }, delay: 1 },
-    { Icon: Syringe, color: 'var(--color-teal-light)', size: 56, initial: { x: 250, y: 150 }, animate: { y: [150, 120, 150], rotate: [45, 60, 30, 45] }, delay: 2 },
-    { Icon: Stethoscope, color: 'var(--color-teal-dark)', size: 72, initial: { x: -350, y: 100 }, animate: { y: [100, 70, 100], rotate: [-15, 0, -15] }, delay: 0.5 },
-    { Icon: TestTube, color: 'var(--color-gold)', size: 40, initial: { x: 0, y: 250 }, animate: { y: [250, 210, 250], rotate: [0, 20, -20, 0] }, delay: 1.5 },
-    { Icon: Microscope, color: 'var(--color-teal)', size: 80, initial: { x: -450, y: -50 }, animate: { y: [-50, -80, -50], rotate: [0, 5, -5, 0] }, delay: 2.5 },
-  ];
-
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 flex items-center justify-center opacity-40 dark:opacity-20">
-      {icons.map((item, i) => {
-        const { Icon, color, size, initial, animate, delay } = item;
-        return (
-          <motion.div
-            key={i}
-            className="absolute"
-            initial={initial}
-            animate={prefersReduced ? initial : animate}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: delay,
-            }}
-          >
-            <Icon size={size} style={{ color }} strokeWidth={1.5} />
-          </motion.div>
-        );
-      })}
+    <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-white/40 dark:from-black/40 dark:via-transparent dark:to-black/40 z-10" />
+      <img 
+        src="/hero-bg.png" 
+        alt="Azzay Pharmacy Hero" 
+        className="w-full h-full object-cover opacity-60 dark:opacity-30"
+      />
     </div>
   );
 }
@@ -88,14 +62,14 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-transparent transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white shadow-lg" style={{ background: 'linear-gradient(135deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, #00838F 100%)' }}>
-              <Stethoscope size={18} />
+          <Link href="/" className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-md border border-emerald-100">
+              <img src="/logo.png" alt="Azzay Pharmacy Logo" className="w-full h-full object-contain p-1" />
             </div>
             <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              PharmaPOS <span className="font-normal" style={{ color: 'var(--color-teal)' }}>Pro</span>
+              Azzay Pharmacy <span className="font-normal" style={{ color: 'var(--color-teal)' }}>Pro</span>
             </span>
-          </div>
+          </Link>
           <PharmaNewsTicker />
           <div className="flex items-center gap-4 shrink-0 ml-auto">
             <a href="#pricing" className="text-sm font-medium hidden sm:block hover:opacity-80 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
@@ -339,7 +313,7 @@ export default function LandingPage() {
               className="px-8 py-4 rounded-xl text-lg font-semibold text-white transition-all active:scale-95 w-full sm:w-auto"
               style={{ background: 'var(--color-teal)' }}
             >
-              Start using PharmaPOS
+              Start using Azzay Pharmacy
             </Link>
             <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
               <CheckCircle2 size={16} style={{ color: 'var(--color-teal)' }} /> No credit card required

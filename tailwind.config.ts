@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // PharmaPOS Pro brand — always use CSS vars, never hardcode hex in JS
+        // Azzay Pharmacy Pro brand — always use CSS vars, never hardcode hex in JS
         teal: {
           DEFAULT: 'var(--color-teal)',
           dark: 'var(--color-teal-dark)',

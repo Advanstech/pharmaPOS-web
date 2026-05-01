@@ -9,8 +9,10 @@ interface AuthState {
   // Access token lives in memory ONLY — never persisted to localStorage
   accessToken: string | null;
   refreshToken: string | null;
+  hasHydrated: boolean;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   setAccessToken: (token: string) => void;
+  setHasHydrated: (value: boolean) => void;
   clearAuth: () => void;
 }
 
@@ -20,6 +22,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
+      hasHydrated: false,
 
       setAuth: (user, accessToken, refreshToken) =>
         set({ user, accessToken, refreshToken }),
@@ -27,12 +30,18 @@ export const useAuthStore = create<AuthState>()(
       // Called by token refresh interceptor
       setAccessToken: (accessToken) => set({ accessToken }),
 
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
       clearAuth: () => set({ user: null, accessToken: null, refreshToken: null }),
     }),
     {
       name: 'pharmapos-auth',
-      // Only persist user profile — tokens are re-acquired on page load via refresh
-      partialize: (s) => ({ user: s.user }),
+      // Persist user profile + refresh token so access token can be silently refreshed after reload.
+      // Access token remains in memory only.
+      partialize: (s) => ({ user: s.user, refreshToken: s.refreshToken }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

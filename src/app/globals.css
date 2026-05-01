@@ -4,11 +4,11 @@
 
 /* ── Brand tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --color-teal:        #006D77;
-  --color-teal-dark:   #004E57;
-  --color-teal-light:  #C8E6EA;
-  --color-gold:        #E8A838;
-  --color-gold-surface:#FDF3DC;
+  --color-teal:        #064E3B; /* Deep Emerald Green */
+  --color-teal-dark:   #06392F;
+  --color-teal-light:  #D1FAE5;
+  --color-gold:        #D97706; /* Golden Amber */
+  --color-gold-surface:#FEF3C7;
 
   /* Classification */
   --color-otc:        #16a34a;
@@ -74,9 +74,9 @@ html {
 html.dark {
   color-scheme: dark;
 
-  --color-teal:        #4DB6C1;
-  --color-teal-dark:   #C8E6EA;
-  --color-teal-light:  #003D45;
+  --color-teal:        #34D399;
+  --color-teal-dark:   #D1FAE5;
+  --color-teal-light:  #064E3B;
 
   --surface-base:      #0A1518;
   --surface-card:      #111E22;
@@ -287,7 +287,7 @@ html.dark .glass {
   justify-content: center;
   padding: 24px;
   overflow: hidden;
-  background: linear-gradient(145deg, #003840 0%, #004E57 40%, #006D77 75%, #00838F 100%);
+  background: linear-gradient(145deg, #06392F 0%, #064E3B 40%, #047857 75%, #059669 100%);
 }
 
 /* Animated background blobs */
@@ -301,7 +301,7 @@ html.dark .glass {
 .login-blob-1 {
   width: 520px; height: 520px;
   top: -160px; right: -120px;
-  background: radial-gradient(circle, rgba(0,163,176,0.35) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.35) 0%, transparent 70%);
   animation-delay: 0s;
 }
 .login-blob-2 {
@@ -313,7 +313,7 @@ html.dark .glass {
 .login-blob-3 {
   width: 300px; height: 300px;
   top: 40%; left: 30%;
-  background: radial-gradient(circle, rgba(0,109,119,0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(6, 78, 59, 0.25) 0%, transparent 70%);
   animation-delay: -8s;
 }
 @keyframes blob-drift {
@@ -353,7 +353,7 @@ html.dark .glass {
 /* Top accent gradient bar */
 .login-card-accent {
   height: 4px;
-  background: linear-gradient(90deg, #004E57 0%, #006D77 40%, #E8A838 100%);
+  background: linear-gradient(90deg, #06392F 0%, #064E3B 40%, #D97706 100%);
 }
 
 /* Logo block */
@@ -373,8 +373,8 @@ html.dark .glass {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(145deg, #004E57 0%, #006D77 60%, #00838F 100%);
-  box-shadow: 0 6px 24px rgba(0,109,119,0.45), 0 2px 8px rgba(0,0,0,0.15);
+  background: linear-gradient(145deg, #06392F 0%, #064E3B 60%, #059669 100%);
+  box-shadow: 0 6px 24px rgba(6, 78, 59, 0.45), 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .login-title {
@@ -437,9 +437,9 @@ html.dark .glass {
 }
 .login-input::placeholder { color: #B0C4CA; }
 .login-input:focus {
-  border-color: #006D77;
+  border-color: #064E3B;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(0,109,119,0.12);
+  box-shadow: 0 0 0 3px rgba(6, 78, 59, 0.12);
 }
 
 .login-input-wrap { position: relative; }
@@ -461,7 +461,7 @@ html.dark .glass {
   border-radius: 0 12px 12px 0;
   transition: color 0.15s;
 }
-.login-pw-toggle:hover { color: #006D77; }
+.login-pw-toggle:hover { color: #064E3B; }
 
 /* Error */
 .login-error {
@@ -495,8 +495,8 @@ html.dark .glass {
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #fff;
-  background: linear-gradient(135deg, #004E57 0%, #006D77 60%, #00838F 100%);
-  box-shadow: 0 4px 16px rgba(0,109,119,0.4), 0 1px 4px rgba(0,0,0,0.12);
+  background: linear-gradient(135deg, #06392F 0%, #064E3B 60%, #059669 100%);
+  box-shadow: 0 4px 16px rgba(6, 78, 59, 0.4), 0 1px 4px rgba(0,0,0,0.12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -510,7 +510,7 @@ html.dark .glass {
   box-shadow: none;
 }
 .login-btn:not(:disabled):hover {
-  box-shadow: 0 6px 24px rgba(0,109,119,0.5), 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 24px rgba(6, 78, 59, 0.5), 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .login-spinner {

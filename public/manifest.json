@@ -1,11 +1,11 @@
 {
-  "name": "PharmaPOS Pro",
-  "short_name": "PharmaPOS",
+  "name": "Azzay Pharmacy Pro",
+  "short_name": "Azzay Pharmacy",
   "description": "AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana",
   "start_url": "/pos",
   "display": "standalone",
   "orientation": "landscape",
-  "theme_color": "#006D77",
+  "theme_color": "#064E3B",
   "background_color": "#FFFFFF",
   "categories": ["business", "productivity"],
   "icons": [

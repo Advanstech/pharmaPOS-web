@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const rxUrl = `https://rximage.nlm.nih.gov/api/rximage/1/rxnav?name=${encodeURIComponent(name)}&resolution=600`;
     const rxRes = await fetch(rxUrl, {
       signal: AbortSignal.timeout(10000),
-      headers: { 'User-Agent': 'PharmaPOS/1.0' },
+      headers: { 'User-Agent': 'Azzay Pharmacy/1.0' },
     });
     if (rxRes.ok) {
       const rxData = await rxRes.json();

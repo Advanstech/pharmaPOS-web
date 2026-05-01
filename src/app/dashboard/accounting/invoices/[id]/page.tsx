@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import { formatGhs } from '@/lib/utils';
 import { StatusBadge } from '@/components/accounting/AccountingDataTable';
+import { useToast } from '@/components/ui/toast';
 
 // GraphQL Queries and Mutations
 const GET_SUPPLIER_INVOICE = gql`
@@ -122,6 +123,7 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const invoiceId = params.id as string;
+  const { success, error: toastError, warning } = useToast();
   
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
@@ -141,6 +143,7 @@ export default function InvoiceDetailPage() {
     onCompleted: () => {
       setShowPaymentForm(false);
       setPaymentForm({ amount: '', paymentMethod: 'BANK_TRANSFER', reference: '', notes: '' });
+      success('Payment recorded');
       refetch();
     },
   });
@@ -153,7 +156,7 @@ export default function InvoiceDetailPage() {
     const amountPesewas = Math.round(parseFloat(paymentForm.amount.replace(/[^0-9.]/g, '')) * 100);
     
     if (amountPesewas <= 0 || amountPesewas > invoice.balancePesewas) {
-      alert('Invalid payment amount');
+      warning('Invalid amount', 'Enter a valid amount not exceeding the outstanding balance.');
       return;
     }
 
@@ -171,8 +174,7 @@ export default function InvoiceDetailPage() {
         },
       });
     } catch (err) {
-      console.error('Failed to record payment:', err);
-      alert('Failed to record payment. Please try again.');
+      toastError('Payment failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setRecordingPayment(false);
     }

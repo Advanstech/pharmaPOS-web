@@ -11,6 +11,7 @@ import { GET_STAFF_EXPENSES } from '@/lib/graphql/expenses.queries';
 import { APPROVE_STAFF_EXPENSE } from '@/lib/graphql/expenses.mutations';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { Pagination } from '@/components/ui/pagination';
+import { useToast, useConfirm, usePrompt } from '@/components/ui/toast';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; icon: typeof Clock }> = {
   PENDING:    { bg: 'rgba(234,179,8,0.12)', color: '#a16207', icon: Clock },
@@ -25,6 +26,9 @@ export default function ExpensesPage() {
   const itemsPerPage = 10;
   const user = useAuthStore(s => s.user);
   const canApprove = user && ['owner', 'se_admin', 'manager'].includes(user.role);
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
+  const { prompt } = usePrompt();
 
   const { data, loading, error, refetch } = useQuery(GET_STAFF_EXPENSES, {
     variables: statusFilter ? { status: statusFilter } : {},
@@ -63,8 +67,9 @@ export default function ExpensesPage() {
           },
         },
       });
+      approve ? success('Expense approved') : success('Expense rejected');
     } catch (err: any) {
-      alert(err?.message || 'Action failed. Please try again.');
+      toastError('Action failed', err?.message);
     }
   };
 
@@ -199,11 +204,17 @@ export default function ExpensesPage() {
                       </Link>
                       {canApprove && expense.status === 'PENDING' && (
                         <>
-                          <button type="button" onClick={() => { if (confirm('Approve this expense?')) handleAction(expense.id, true); }}
+                          <button type="button" onClick={async () => {
+                            const ok = await confirm({ title: 'Approve this expense?', message: `${expense.description} — ${expense.amountFormatted}`, confirmLabel: 'Approve', danger: false });
+                            if (ok) handleAction(expense.id, true);
+                          }}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-white" style={{ background: '#16a34a' }}>
                             <ThumbsUp size={11} /> Approve
                           </button>
-                          <button type="button" onClick={() => { const r = prompt('Reason for rejection:'); if (r) handleAction(expense.id, false, r); }}
+                          <button type="button" onClick={async () => {
+                            const r = await prompt({ title: 'Reason for rejection', placeholder: 'e.g. Missing receipt', required: true, confirmLabel: 'Reject' });
+                            if (r) handleAction(expense.id, false, r);
+                          }}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}>
                             <ThumbsDown size={11} /> Reject
                           </button>

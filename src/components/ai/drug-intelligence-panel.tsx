@@ -7,6 +7,7 @@ import {
   Thermometer, BookOpen, ExternalLink, ChevronDown, ChevronUp,
   Sparkles, ShieldCheck, MessageSquare, Loader2, RefreshCw,
 } from 'lucide-react';
+import { aiFetch } from '@/lib/ai/fetch-with-auth';
 import type { DrugIntelligence } from '@/app/api/drug-intelligence/route';
 import type { Product } from '@/types';
 
@@ -34,14 +35,10 @@ export function DrugIntelligencePanel({ product, onClose }: DrugIntelligencePane
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/drug-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: product.name,
-          genericName: product.genericName ?? '',
-          classification: product.classification,
-        }),
+      const res = await aiFetch('/api/drug-intelligence', {
+        name: product.name,
+        genericName: product.genericName ?? '',
+        classification: product.classification,
       });
       if (!res.ok) throw new Error('Failed to fetch');
       const json = await res.json() as DrugIntelligence;

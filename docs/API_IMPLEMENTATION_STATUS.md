@@ -1,4 +1,4 @@
-# PharmaPOS Pro — API Implementation Status
+# Azzay Pharmacy Pro — API Implementation Status
 
 **Last Updated**: April 19, 2026
 **Status**: Production-Ready for May 2026 Launch

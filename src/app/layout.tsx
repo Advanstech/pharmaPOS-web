@@ -7,10 +7,11 @@ import { LenisProvider } from '@/lib/lenis/lenis-provider';
 import { ThemeSync } from '@/components/theme-sync';
 import { ZoomSync } from '@/components/zoom-sync';
 import { ZoomWrapper } from '@/components/zoom-wrapper';
+import { ToastProvider, ConfirmProvider, PromptProvider } from '@/components/ui/toast';
 
 const THEME_INIT = `(function(){
   try {
-    var raw = localStorage.getItem('pharmapos-theme');
+    var raw = localStorage.getItem('azzay-pharmacy-theme');
     var theme = 'system';
     if (raw) {
       var p = JSON.parse(raw);
@@ -18,7 +19,7 @@ const THEME_INIT = `(function(){
     }
     var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', dark);
-    var zRaw = localStorage.getItem('pharmapos-zoom');
+    var zRaw = localStorage.getItem('azzay-pharmacy-zoom');
     if (zRaw) {
       var z = JSON.parse(zRaw);
       if (z && z.state && z.state.zoom && z.state.zoom !== '100') {
@@ -52,11 +53,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
-    template: '%s | PharmaPOS Pro',
+    default: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
+    template: '%s | Azzay Pharmacy Pro',
   },
   description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana. Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
-  keywords: ['PharmaPOS', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting', 'FDA compliance', 'offline POS'],
+  keywords: ['Azzay Pharmacy', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting', 'FDA compliance', 'offline POS'],
   authors: [{ name: 'Advansis Technologies' }],
   creator: 'Advansis Technologies',
   publisher: 'Advansis Technologies',
@@ -85,22 +86,22 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_GH',
-    siteName: 'PharmaPOS Pro',
-    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    siteName: 'Azzay Pharmacy Pro',
+    title: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
     description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     url: '/',
-    images: [{ url: '/icon.png', width: 512, height: 512, alt: 'PharmaPOS logo' }],
+    images: [{ url: '/icon.png', width: 512, height: 512, alt: 'Azzay Pharmacy logo' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    title: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
     description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     images: ['/icon.png'],
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'PharmaPOS',
+    title: 'Azzay Pharmacy',
   },
   formatDetection: {
     telephone: false,
@@ -113,8 +114,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#006D77' },
-    { media: '(prefers-color-scheme: dark)', color: '#004D55' },
+    { media: '(prefers-color-scheme: light)', color: '#064E3B' },
+    { media: '(prefers-color-scheme: dark)', color: '#06392F' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -143,18 +144,24 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         {/* Inline critical theme script to prevent flash */}
-        <Script id="pharmapos-theme-init" strategy="beforeInteractive">
+        <Script id="azzay-pharmacy-theme-init" strategy="beforeInteractive">
           {THEME_INIT}
         </Script>
         
         <ApolloProvider>
           <ThemeSync />
           <ZoomSync />
-          <LenisProvider>
-            <ZoomWrapper>
-              {children}
-            </ZoomWrapper>
-          </LenisProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <PromptProvider>
+                <LenisProvider>
+                  <ZoomWrapper>
+                    {children}
+                  </ZoomWrapper>
+                </LenisProvider>
+              </PromptProvider>
+            </ConfirmProvider>
+          </ToastProvider>
         </ApolloProvider>
       </body>
     </html>

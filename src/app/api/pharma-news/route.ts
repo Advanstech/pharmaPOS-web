@@ -17,7 +17,7 @@ async function fetchFeed(url: string, limit: number): Promise<Array<{ title: str
       signal: ctrl.signal,
       headers: {
         Accept: 'application/rss+xml, application/xml, text/xml, */*',
-        'User-Agent': 'PharmaPOS-Pro/1.0 (staff-awareness-ticker)',
+        'User-Agent': 'Azzay Pharmacy-Pro/1.0 (staff-awareness-ticker)',
       },
       next: { revalidate: 900 },
     });

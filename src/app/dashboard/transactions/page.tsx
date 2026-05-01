@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { useLazyQuery, useQuery } from '@apollo/client';
+import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Receipt, TrendingUp, ShoppingBag, DollarSign,
   Printer, Clock, ChevronRight, Filter, X,
+  RotateCcw, CheckCircle2, XCircle, AlertTriangle,
 } from 'lucide-react';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { formatGhs } from '@/lib/utils';
 import { GhsMoney } from '@/components/ui/ghs-money';
 import { useAuthStore } from '@/lib/store/auth.store';
 import Link from 'next/link';
-import { RECENT_SALES, SALE_DETAIL } from '@/lib/graphql/sales.queries';
+import {
+  RECENT_SALES, SALE_DETAIL,
+  REFUND_REQUESTS, APPROVE_REFUND_REQUEST, REJECT_REFUND_REQUEST,
+} from '@/lib/graphql/sales.queries';
 import { AiCopilotBanner } from '@/components/dashboard/ai-copilot-banner';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
 import { Pagination } from '@/components/ui/pagination';
@@ -633,6 +637,9 @@ export default function TransactionsPage() {
         </div>
       )}
 
+      {/* ── Refund Requests — manager/owner only ── */}
+      {branchWideSales && <RefundRequestsPanel />}
+
       <div
         className="overflow-x-auto rounded-xl"
         style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
@@ -831,5 +838,270 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
         <X size={10} />
       </button>
     </span>
+  );
+}
+
+// ── Refund Requests Panel ─────────────────────────────────────────────────────
+
+interface RefundRequest {
+  id: string;
+  saleId: string;
+  saleTotalFormatted: string;
+  reason: string;
+  status: string;
+  requestedByName: string;
+  reviewedByName?: string | null;
+  reviewNotes?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  saleItemCount: number;
+}
+
+function RefundRequestsPanel() {
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const { data, loading, refetch } = useQuery<{ refundRequests: RefundRequest[] }>(
+    REFUND_REQUESTS,
+    { fetchPolicy: 'cache-and-network', pollInterval: 30_000 },
+  );
+
+  const [approve] = useMutation(APPROVE_REFUND_REQUEST, {
+    onCompleted: (d) => {
+      setProcessingId(null);
+      setExpanded(null);
+      showToast('success', `✅ Refund approved — sale reversed, stock returned to inventory, GL updated.`);
+      refetch();
+    },
+    onError: (e) => {
+      setProcessingId(null);
+      showToast('error', `❌ Approval failed: ${e.message}`);
+    },
+  });
+
+  const [reject] = useMutation(REJECT_REFUND_REQUEST, {
+    onCompleted: () => {
+      setProcessingId(null);
+      setExpanded(null);
+      showToast('success', `Refund request rejected and cashier notified.`);
+      refetch();
+    },
+    onError: (e) => {
+      setProcessingId(null);
+      showToast('error', `❌ Rejection failed: ${e.message}`);
+    },
+  });
+
+  const handleApprove = (req: RefundRequest) => {
+    setProcessingId(req.id);
+    approve({ variables: { requestId: req.id, notes: notes[req.id] || undefined } });
+  };
+
+  const handleReject = (req: RefundRequest) => {
+    const n = notes[req.id]?.trim();
+    if (!n) {
+      showToast('error', 'Add a rejection reason in the notes field before rejecting.');
+      return;
+    }
+    setProcessingId(req.id);
+    reject({ variables: { requestId: req.id, notes: n } });
+  };
+
+  const requests = data?.refundRequests ?? [];
+  const pending = requests.filter(r => r.status === 'PENDING');
+  const reviewed = requests.filter(r => r.status !== 'PENDING');
+
+  if (loading && requests.length === 0) return null;
+  if (requests.length === 0) return null;
+
+  return (
+    <div className="mb-6 rounded-2xl overflow-hidden"
+      style={{ border: '1px solid rgba(220,38,38,0.2)', background: 'var(--surface-card)', boxShadow: '0 4px 16px rgba(220,38,38,0.06)' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div className="mx-5 mt-4 rounded-xl px-4 py-3 text-xs font-semibold flex items-center gap-2"
+          style={{
+            background: toast.type === 'success' ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)',
+            border: `1px solid ${toast.type === 'success' ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'}`,
+            color: toast.type === 'success' ? '#15803d' : '#b91c1c',
+          }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3"
+        style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(220,38,38,0.03)' }}>
+        <div className="flex items-center gap-2">
+          <RotateCcw size={15} style={{ color: '#dc2626' }} />
+          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            Refund Requests
+          </h2>
+          {pending.length > 0 && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+              style={{ background: '#dc2626' }}>
+              {pending.length}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          {pending.length} pending · {reviewed.length} reviewed
+        </p>
+      </div>
+
+      {/* Pending requests */}
+      {pending.length === 0 ? (
+        <div className="px-5 py-4 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <CheckCircle2 size={14} style={{ color: '#16a34a' }} />
+          No pending refund requests — all clear.
+        </div>
+      ) : (
+        <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
+          {pending.map(req => {
+            const isOpen = expanded === req.id;
+            const isProcessing = processingId === req.id;
+
+            return (
+              <div key={req.id}>
+                {/* Summary row */}
+                <button
+                  onClick={() => !isProcessing && setExpanded(isOpen ? null : req.id)}
+                  className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-[rgba(0,0,0,0.015)] transition-colors"
+                  disabled={isProcessing}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: isProcessing ? 'rgba(13,148,136,0.1)' : 'rgba(220,38,38,0.08)' }}>
+                    {isProcessing
+                      ? <span className="h-4 w-4 rounded-full border-2 border-teal/30 border-t-teal animate-spin" />
+                      : <RotateCcw size={14} style={{ color: '#dc2626' }} />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {req.saleTotalFormatted}
+                      </span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {req.saleItemCount} item{req.saleItemCount !== 1 ? 's' : ''}
+                      </span>
+                      <Link
+                        href={`/dashboard/refunds/${req.id}`}
+                        onClick={e => e.stopPropagation()}
+                        className="text-[10px] font-mono font-semibold hover:underline"
+                        style={{ color: 'var(--color-teal)' }}
+                      >
+                        {req.saleId.slice(0, 8)}…
+                      </Link>
+                    </div>
+                    <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Reason: </span>{req.reason}
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      Requested by <strong>{req.requestedByName}</strong> · {new Date(req.createdAt).toLocaleString('en-GH', { timeZone: 'Africa/Accra', dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                    {isProcessing && (
+                      <p className="text-[10px] font-semibold mt-0.5" style={{ color: 'var(--color-teal)' }}>
+                        Processing… reversing sale, updating inventory &amp; GL
+                      </p>
+                    )}
+                  </div>
+                  <ChevronRight size={14} className="shrink-0 transition-transform"
+                    style={{ color: 'var(--text-muted)', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                </button>
+
+                {/* Expanded approve/reject form */}
+                {isOpen && !isProcessing && (
+                  <div className="px-5 pb-4 pt-1" style={{ background: 'rgba(0,0,0,0.015)', borderTop: '1px solid var(--surface-border)' }}>
+                    {/* What happens on approval */}
+                    <div className="mb-3 rounded-xl p-3 text-xs space-y-1"
+                      style={{ background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)' }}>
+                      <p className="font-bold" style={{ color: '#b91c1c' }}>⚠️ Approving will:</p>
+                      <ul className="space-y-0.5 ml-2" style={{ color: 'var(--text-secondary)' }}>
+                        <li>• Mark sale as REFUNDED ({req.saleTotalFormatted})</li>
+                        <li>• Return {req.saleItemCount} item{req.saleItemCount !== 1 ? 's' : ''} back to inventory</li>
+                        <li>• Reverse the GL entries (revenue, VAT, COGS)</li>
+                        <li>• Log to audit trail</li>
+                      </ul>
+                    </div>
+
+                    <label className="block text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
+                      Review notes <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional for approval, required for rejection)</span>
+                    </label>
+                    <input
+                      value={notes[req.id] ?? ''}
+                      onChange={e => setNotes(prev => ({ ...prev, [req.id]: e.target.value }))}
+                      placeholder="e.g. Verified with customer — wrong product dispensed"
+                      className="w-full rounded-lg border px-3 py-2 text-xs mb-3"
+                      style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(req)}
+                        className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white"
+                        style={{ background: '#16a34a' }}
+                      >
+                        <CheckCircle2 size={13} />
+                        Approve &amp; Refund
+                      </button>
+                      <button
+                        onClick={() => handleReject(req)}
+                        className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold"
+                        style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}
+                      >
+                        <XCircle size={13} />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => setExpanded(null)}
+                        className="text-xs font-medium px-3 py-2 rounded-xl"
+                        style={{ color: 'var(--text-muted)', border: '1px solid var(--surface-border)' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Recently reviewed — collapsed summary */}
+      {reviewed.length > 0 && (
+        <div className="px-5 py-2.5" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+            Recently reviewed
+          </p>
+          <div className="space-y-1">
+            {reviewed.slice(0, 3).map(req => (
+              <div key={req.id} className="flex items-center gap-2 text-[11px]">
+                {req.status === 'APPROVED'
+                  ? <CheckCircle2 size={11} style={{ color: '#16a34a' }} />
+                  : <XCircle size={11} style={{ color: '#dc2626' }} />
+                }
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {req.saleTotalFormatted} — {req.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                  {req.reviewedByName ? ` by ${req.reviewedByName}` : ''}
+                </span>
+                <Link href={`/dashboard/refunds/${req.id}`}
+                  className="font-mono text-[10px] hover:underline" style={{ color: 'var(--color-teal)' }}>
+                  View details
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

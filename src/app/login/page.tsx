@@ -6,7 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useMutation, type ApolloError } from '@apollo/client';
 import { Eye, EyeOff, Loader2, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { LOGIN_MUTATION } from '@/lib/graphql/auth.queries';
+import { LOGIN_MUTATION, REQUEST_PASSWORD_RESET_MUTATION } from '@/lib/graphql/auth.queries';
 import { postLoginPathForRole, asUserRole } from '@/lib/auth/post-login-path';
 import type { AuthUser } from '@/types';
 import Link from 'next/link';
@@ -18,6 +18,10 @@ interface LoginResult {
     expires_in: number;
     user: Omit<AuthUser, 'role'> & { role: string };
   };
+}
+
+interface RequestPasswordResetResult {
+  requestPasswordReset: boolean;
 }
 
 function messageFromLoginError(err: unknown): string {
@@ -62,7 +66,7 @@ const S = {
     width: 560, height: 560,
     top: -180, right: -140,
     borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(0,163,176,0.15) 0%, transparent 70%)',
+    background: 'radial-gradient(circle, rgba(52, 211, 153, 0.15) 0%, transparent 70%)',
     filter: 'blur(72px)',
     pointerEvents: 'none' as const,
     animation: 'blobDrift 14s ease-in-out infinite alternate',
@@ -82,7 +86,7 @@ const S = {
     width: 320, height: 320,
     top: '45%', left: '35%',
     borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(0,109,119,0.1) 0%, transparent 70%)',
+    background: 'radial-gradient(circle, rgba(6, 78, 59, 0.1) 0%, transparent 70%)',
     filter: 'blur(60px)',
     pointerEvents: 'none' as const,
     animation: 'blobDrift 10s ease-in-out infinite alternate',
@@ -128,8 +132,8 @@ const S = {
     alignItems: 'center',
     justifyContent: 'center',
     color: '#fff',
-    background: 'linear-gradient(145deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, #00838F 100%)',
-    boxShadow: '0 8px 28px rgba(0,109,119,0.3), 0 2px 8px rgba(0,0,0,0.1)',
+    background: 'linear-gradient(145deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, var(--color-teal) 100%)',
+    boxShadow: '0 8px 28px rgba(6, 78, 59, 0.3), 0 2px 8px rgba(0,0,0,0.1)',
     flexShrink: 0,
   },
   title: {
@@ -190,7 +194,7 @@ const S = {
   inputFocused: {
     borderColor: 'var(--color-teal)',
     background: 'var(--surface-card)',
-    boxShadow: '0 0 0 3px rgba(0,109,119,0.14)',
+    boxShadow: '0 0 0 3px rgba(6, 78, 59, 0.14)',
   },
   inputWrap: {
     position: 'relative' as const,
@@ -216,8 +220,59 @@ const S = {
     touchAction: 'manipulation',
   },
   pwToggleActive: {
-    background: 'rgba(0,109,119,0.08)',
+    background: 'rgba(6, 78, 59, 0.08)',
     color: 'var(--color-teal)',
+  },
+  forgotWrap: {
+    marginTop: -6,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  forgotBtn: {
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--color-teal)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    padding: 0,
+    textDecoration: 'underline',
+    textUnderlineOffset: '2px',
+  },
+  forgotPanel: {
+    borderRadius: 10,
+    border: '1px solid var(--surface-border)',
+    background: 'var(--surface-base)',
+    padding: '10px 12px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 8,
+  },
+  forgotHint: {
+    margin: 0,
+    fontSize: 12,
+    color: 'var(--text-muted)',
+  },
+  forgotRow: {
+    display: 'flex',
+    gap: 8,
+  },
+  forgotSendBtn: {
+    border: '1px solid var(--surface-border)',
+    background: 'var(--surface-card)',
+    color: 'var(--text-primary)',
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: 600,
+    padding: '0 12px',
+    cursor: 'pointer',
+  },
+  forgotSuccess: {
+    margin: 0,
+    fontSize: 12,
+    color: '#16a34a',
   },
   error: {
     display: 'flex',
@@ -248,8 +303,8 @@ const S = {
     fontWeight: 600,
     letterSpacing: '0.01em',
     color: '#fff',
-    background: 'linear-gradient(135deg, var(--color-teal-dark) 0%, var(--color-teal) 55%, #00838F 100%)',
-    boxShadow: '0 4px 18px rgba(0,109,119,0.3), 0 1px 4px rgba(0,0,0,0.1)',
+    background: 'linear-gradient(135deg, var(--color-teal-dark) 0%, var(--color-teal) 55%, var(--color-teal) 100%)',
+    boxShadow: '0 4px 18px rgba(6, 78, 59, 0.3), 0 1px 4px rgba(0,0,0,0.1)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -263,7 +318,7 @@ const S = {
   },
   btnActive: {
     transform: 'scale(0.98)',
-    boxShadow: '0 2px 10px rgba(0,109,119,0.25)',
+    boxShadow: '0 2px 10px rgba(6, 78, 59, 0.25)',
   },
   btnDisabled: {
     opacity: 0.42,
@@ -314,8 +369,12 @@ export default function LoginPage() {
   const [pwFocus, setPwFocus]         = useState(false);
   const [btnActive, setBtnActive]     = useState(false);
   const [eyeActive, setEyeActive]     = useState(false);
+  const [showForgot, setShowForgot]   = useState(false);
+  const [resetEmail, setResetEmail]   = useState('');
+  const [resetSent, setResetSent]     = useState(false);
 
   const [login, { loading }] = useMutation<LoginResult>(LOGIN_MUTATION);
+  const [requestPasswordReset, { loading: resetLoading }] = useMutation<RequestPasswordResetResult>(REQUEST_PASSWORD_RESET_MUTATION);
 
   // Already signed in (persisted refresh + profile) — go to role home
   useEffect(() => {
@@ -324,6 +383,21 @@ export default function LoginPage() {
       router.replace(postLoginPathForRole(user.role));
     }
   }, [router]);
+
+  async function handleRequestReset(): Promise<void> {
+    const emailToUse = (resetEmail || email).trim();
+    if (!emailToUse) {
+      setError('Enter your email address to request a password reset link.');
+      return;
+    }
+    try {
+      await requestPasswordReset({ variables: { email: emailToUse } });
+      setResetSent(true);
+      setError('');
+    } catch (err) {
+      setError(messageFromLoginError(err));
+    }
+  }
 
   // Inject keyframes once on mount
   useEffect(() => {
@@ -418,12 +492,12 @@ export default function LoginPage() {
           <div style={S.logoBlock}>
             <Link href="/" style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               <motion.div
-                style={S.logoIcon}
+                style={{ ...S.logoIcon, background: 'white', border: '1px solid #D1FAE5', padding: '2px', overflow: 'hidden' }}
                 initial={prefersReduced ? false : { scale: 0, rotate: -15 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
               >
-                <ShieldCheck size={30} strokeWidth={1.7} />
+                <img src="/logo.png" alt="Azzay Pharmacy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </motion.div>
               <motion.div
                 initial={prefersReduced ? false : { opacity: 0, y: 8 }}
@@ -431,7 +505,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.18 }}
                 style={{ textAlign: 'center' }}
               >
-                <h1 style={S.title}>PharmaPOS Pro</h1>
+                <h1 style={S.title}>Azzay Pharmacy Pro</h1>
                 <p style={S.subtitle}>Azzay Pharmacy &nbsp;·&nbsp; Accra, Ghana</p>
               </motion.div>
             </Link>
@@ -499,6 +573,48 @@ export default function LoginPage() {
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <div style={S.forgotWrap}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Need help signing in?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgot((v) => !v);
+                    setResetSent(false);
+                    if (!resetEmail) setResetEmail(email);
+                  }}
+                  style={S.forgotBtn}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              {showForgot && (
+                <div style={S.forgotPanel}>
+                  <p style={S.forgotHint}>We’ll send a reset link to your email.</p>
+                  <div style={S.forgotRow}>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@azzaypharmacy.com"
+                      style={{ ...S.input, height: 42, fontSize: 14 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleRequestReset()}
+                      disabled={resetLoading}
+                      style={{ ...S.forgotSendBtn, opacity: resetLoading ? 0.6 : 1, cursor: resetLoading ? 'not-allowed' : 'pointer' }}
+                    >
+                      {resetLoading ? 'Sending…' : 'Send Link'}
+                    </button>
+                  </div>
+                  {resetSent && (
+                    <p style={S.forgotSuccess}>
+                      If that account exists, a reset link has been sent.
+                    </p>
+                  )}
+                </div>
+              )}
             </motion.div>
 
             {/* Error */}
@@ -533,7 +649,7 @@ export default function LoginPage() {
               onMouseDown={() => setBtnActive(true)}
               onMouseUp={() => setBtnActive(false)}
               onMouseLeave={() => setBtnActive(false)}
-              whileHover={prefersReduced || isDisabled ? {} : { scale: 1.015, boxShadow: '0 6px 28px rgba(0,109,119,0.55)' }}
+              whileHover={prefersReduced || isDisabled ? {} : { scale: 1.015, boxShadow: '0 6px 28px rgba(6, 78, 59, 0.55)' }}
               whileTap={prefersReduced || isDisabled ? {} : { scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
               initial={prefersReduced ? false : { opacity: 0, y: 10 }}
@@ -545,7 +661,7 @@ export default function LoginPage() {
                   Signing in…
                 </>
               ) : (
-                'Sign in to PharmaPOS'
+                'Sign in to Azzay Pharmacy'
               )}
             </motion.button>
           </form>

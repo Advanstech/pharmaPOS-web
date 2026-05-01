@@ -19,7 +19,7 @@ const ALLOWED_ROLES = [
   'chemical_cashier',
 ] as const;
 
-const SYSTEM_PROMPT = `You are PharmaPOS Pro's AI Copilot — an intelligent pharmacy assistant for a Ghana community pharmacy.
+const SYSTEM_PROMPT = `You are Azzay Pharmacy Pro's AI Copilot — an intelligent pharmacy assistant for a Ghana community pharmacy.
 
 You help pharmacy staff with:
 - Drug information (indications, dosage, side effects, interactions, counselling)

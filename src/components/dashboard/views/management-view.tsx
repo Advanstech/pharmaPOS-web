@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   TrendingUp, ShoppingCart, Package, Users, Activity, ArrowUpRight,
-  DollarSign, Clock, Zap, BarChart3, CreditCard, CalendarCheck,
+  DollarSign, Clock, Zap, BarChart3, CreditCard, CalendarCheck, RotateCcw,
 } from 'lucide-react';
 import {
   Area, AreaChart, ResponsiveContainer, Tooltip, Bar, BarChart, Cell,
@@ -351,6 +351,7 @@ export function ManagementView({ user }: ManagementViewProps) {
               { href: '/dashboard/end-of-day', icon: CalendarCheck, label: 'End of Day', color: '#3b82f6' },
               { href: '/dashboard/expenses', icon: CreditCard, label: 'Expenses', color: '#f59e0b', badge: pendingExpenses > 0 ? String(pendingExpenses) : undefined },
               { href: '/dashboard/transfers', icon: Package, label: 'Transfers', color: '#8b5cf6' },
+              { href: '/dashboard/refunds', icon: RotateCcw, label: 'Refunds', color: '#dc2626' },
               { href: '/dashboard/accounting', icon: DollarSign, label: 'Accounting', color: '#0d9488' },
               { href: '/dashboard/cfo', icon: Zap, label: 'CFO Brief', color: '#f59e0b' },
             ].map(action => (

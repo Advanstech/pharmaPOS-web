@@ -12,6 +12,7 @@ import { PharmaProductVisual } from '@/components/dashboard/executive/pharma-pro
 import { canAdjustStock, canReceiveStock } from '@/lib/auth/inventory-access';
 import { ProductEditModal } from '@/components/inventory/product-edit-modal';
 import { cn } from '@/lib/utils';
+import { useToast, useConfirm } from '@/components/ui/toast';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -78,6 +79,8 @@ export default function InventoryProductDetailPage() {
   const [formMessage, setFormMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const canEditProduct = ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(role ?? '');
+  const { info } = useToast();
+  const { confirm } = useConfirm();
 
   // Auto-open edit modal when ?edit=true is in the URL
   useEffect(() => {
@@ -332,10 +335,10 @@ export default function InventoryProductDetailPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm('Are you sure you want to deactivate this product? It will be hidden from POS and inventory.')) {
-                        // Deactivate product via mutation
-                        setFormMessage({ type: 'ok', text: 'Product deactivation requires the product edit modal. Click Edit → toggle Active status.' });
-                      }
+                      void (async () => {
+                        const ok = await confirm({ title: 'Deactivate this product?', message: 'It will be hidden from POS and inventory.', confirmLabel: 'Deactivate', danger: true });
+                        if (ok) info('Use the Edit modal', 'Click Edit → Deactivate to remove this product.');
+                      })();
                     }}
                     className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-red-50"
                     style={{ borderColor: 'rgba(220,38,38,0.2)', color: '#dc2626' }}

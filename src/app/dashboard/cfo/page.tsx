@@ -114,7 +114,7 @@ export default function CfoPage() {
     const alerts = ((briefing.alerts as CfoAlert[]) ?? []).slice(0, 4);
     const recommendations = (((briefing.investmentIntelligence as { recommendations?: unknown[] })?.recommendations ?? []) as unknown[]).length;
     const body = [
-      'PharmaPOS Pro - CFO Briefing',
+      'Azzay Pharmacy Pro - CFO Briefing',
       `Generated: ${new Date(briefing.generatedAt as string).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}`,
       '',
       `Health score: ${briefing.healthScoreNumeric}/100`,
@@ -131,7 +131,7 @@ export default function CfoPage() {
       '',
       'Please see attached/printed PDF briefing for full details.',
     ].join('\n');
-    openMailClient('PharmaPOS CFO Briefing - Decision Report', body);
+    openMailClient('Azzay Pharmacy CFO Briefing - Decision Report', body);
   }
 
   return (

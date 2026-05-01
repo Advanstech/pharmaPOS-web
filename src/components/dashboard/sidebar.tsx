@@ -66,17 +66,13 @@ export function Sidebar() {
         style={{ borderBottom: '1px solid var(--surface-border)' }}
       >
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, var(--color-teal-dark), var(--color-teal))',
-            boxShadow: '0 2px 10px rgba(0,78,87,0.35)',
-          }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0 bg-white border border-emerald-50 shadow-sm overflow-hidden p-1"
         >
-          <Stethoscope size={14} className="text-white" />
+          <img src="/logo.png" alt="Azzay Pharmacy" className="w-full h-full object-contain" />
         </div>
         <div className={cn("min-w-0 ml-2.5 transition-opacity duration-200", collapsed ? "hidden" : "hidden md:block")}>
           <p className="text-sm font-bold leading-none truncate" style={{ color: 'color-mix(in oklab, var(--text-primary) 86%, #000 14%)' }}>
-            PharmaPOS Pro
+            Azzay Pharmacy Pro
           </p>
           <p className="text-[10px] mt-0.5 truncate" style={{ color: 'color-mix(in oklab, var(--text-secondary) 88%, #000 12%)' }}>
             {user?.branchName || 'Azzay Pharmacy'}

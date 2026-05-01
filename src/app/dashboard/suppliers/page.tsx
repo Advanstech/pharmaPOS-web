@@ -237,18 +237,31 @@ export default function SuppliersPage() {
               </p>
             </div>
             {canManageSuppliers && (
-              <button
-                type="button"
-                onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:brightness-110 active:scale-[0.97]"
-                style={{
-                  background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-                  boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
-                }}
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                New Supplier
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/dashboard/invoices/upload"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                  style={{
+                    color: 'var(--color-teal)',
+                    background: 'rgba(13,148,136,0.08)',
+                    border: '1px solid rgba(13,148,136,0.25)',
+                  }}
+                >
+                  AI Invoice Upload
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:brightness-110 active:scale-[0.97]"
+                  style={{
+                    background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                    boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
+                  }}
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  New Supplier
+                </button>
+              </div>
             )}
           </div>
 
@@ -426,14 +439,27 @@ export default function SuppliersPage() {
                 Add your first supplier to start tracking stock levels, get reorder alerts, and manage your supply chain.
               </p>
               {canManageSuppliers && (
-                <button
-                  type="button"
-                  onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
-                >
-                  <Plus size={16} /> Add First Supplier
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <Link
+                    href="/dashboard/invoices/upload"
+                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                    style={{
+                      color: 'var(--color-teal)',
+                      background: 'rgba(13,148,136,0.08)',
+                      border: '1px solid rgba(13,148,136,0.25)',
+                    }}
+                  >
+                    AI Invoice Upload
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
+                    className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
+                  >
+                    <Plus size={16} /> Add First Supplier
+                  </button>
+                </div>
               )}
             </div>
           )}

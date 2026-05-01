@@ -1,5 +1,5 @@
 /**
- * PharmaPOS Pro brand tokens — single source of truth
+ * Azzay Pharmacy Pro brand tokens — single source of truth
  * Inlined from packages/ui — no workspace dependency at deploy time
  * Use CSS custom properties in components, never hardcode hex in JS
  */

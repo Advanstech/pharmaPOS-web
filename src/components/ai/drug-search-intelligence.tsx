@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import type { DrugIntelligence } from '@/app/api/drug-intelligence/route';
 
+import { aiFetch } from '@/lib/ai/fetch-with-auth';
+
 const QUICK_SEARCHES = [
   'Amoxicillin', 'Paracetamol', 'Metformin', 'Amlodipine',
   'Artemether-Lumefantrine', 'Omeprazole', 'Ciprofloxacin', 'Ibuprofen',
@@ -40,10 +42,8 @@ export function DrugSearchIntelligence() {
     setData(null);
     setActiveSection('overview');
     try {
-      const res = await fetch('/api/drug-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: drugName.trim(), genericName: '', classification: 'OTC' }),
+      const res = await aiFetch('/api/drug-intelligence', {
+        name: drugName.trim(), genericName: '', classification: 'OTC',
       });
       if (!res.ok) throw new Error('Failed');
       const json = await res.json() as DrugIntelligence;

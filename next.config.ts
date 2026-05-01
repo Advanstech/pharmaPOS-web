@@ -3,17 +3,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 /** Monorepo root (pnpm-workspace.yaml) — avoids Turbopack picking a stray lockfile higher in the tree. */
-const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   
   // ── Performance Optimizations ──────────────────────────────────────────────
   
-  // Turbopack configuration for maximum speed
-  turbopack: {
-    root: monorepoRoot,
-  },
+  // Turbopack disabled due to stability issues - using webpack instead
+  // turbopack: {
+  //   root: monorepoRoot,
+  // },
   
   // Compiler optimizations
   compiler: {
@@ -127,11 +127,9 @@ const nextConfig: NextConfig = {
   // ── Experimental Features ──────────────────────────────────────────────────
   
   experimental: {
-    // Enable optimized font loading
-    optimizeServerReact: true,
-    
-    // Parallel route prefetching for faster navigation
-    parallelServerCompiles: true,
+    // Disable experimental features to prevent Turbopack crashes
+    // optimizeServerReact: false,
+    // parallelServerCompiles: false,
     
     // Faster server actions
     serverActions: {

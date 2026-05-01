@@ -56,7 +56,7 @@ export interface DrugIntelligence {
   generatedAt: string;
 }
 
-const SYSTEM_PROMPT = `You are PharmaPOS Pro's clinical drug intelligence engine for a Ghana pharmacy.
+const SYSTEM_PROMPT = `You are Azzay Pharmacy Pro's clinical drug intelligence engine for a Ghana pharmacy.
 You provide accurate, concise, Ghana-context-aware drug information for pharmacy staff.
 Always respond in valid JSON matching the exact schema provided.
 Use plain language suitable for pharmacy staff (not patients).

@@ -32,11 +32,19 @@ interface RefreshResult {
 export function useAuthGuard(): { ready: boolean } {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const user = useAuthStore((s) => s.user);
+  const setAccessToken = useAuthStore((s) => s.setAccessToken);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const [doRefresh] = useMutation<RefreshResult>(REFRESH_TOKEN_MUTATION);
 
   useEffect(() => {
-    const { accessToken, refreshToken, user, setAccessToken, clearAuth } = useAuthStore.getState();
+    if (!hasHydrated) {
+      return;
+    }
 
     if (accessToken && !isJwtExpired(accessToken)) {
       setReady(true);
@@ -63,7 +71,7 @@ export function useAuthGuard(): { ready: boolean } {
         clearAuth();
         router.replace('/login');
       });
-  }, [router, doRefresh]);
+  }, [hasHydrated, accessToken, refreshToken, user, doRefresh, router, setAccessToken, clearAuth]);
 
   return { ready };
 }
