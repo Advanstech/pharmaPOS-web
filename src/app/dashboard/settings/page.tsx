@@ -84,7 +84,7 @@ export default function DashboardSettingsPage() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Increase the display size for large touch screens or night shifts. Recommended: 110% for pharmacy counters, 120% for wall-mounted displays.
           </p>
-          <div className="mt-4 grid grid-cols-5 gap-2">
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
             {ZOOM_OPTIONS.map(opt => {
               const selected = zoom === opt.value;
               return (
@@ -111,7 +111,7 @@ export default function DashboardSettingsPage() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Azzay Pharmacy works offline for cash sales. Transactions queue locally and sync when connection returns.
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-xl p-3 text-center" style={{ background: isOnline ? 'rgba(22,163,74,0.06)' : 'rgba(220,38,38,0.06)', border: '1px solid ' + (isOnline ? 'rgba(22,163,74,0.2)' : 'rgba(220,38,38,0.2)') }}>
               <p className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Status</p>
               <p className="text-sm font-bold mt-1" style={{ color: isOnline ? '#16a34a' : '#dc2626' }}>{isOnline ? 'Online' : 'Offline'}</p>
@@ -236,7 +236,7 @@ function ChangePasswordSection() {
         />
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           onClick={() => void handleSubmit()}
           disabled={loading || !canSubmit}
@@ -346,7 +346,7 @@ function TaxConfigSection() {
       {tax && !editing && (
         <div className="space-y-3">
           {/* Rate display */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'VAT (GRA)', value: tax.vatRatePct, desc: 'Standard rate' },
               { label: 'NHIL', value: tax.nhilRatePct, desc: 'Health insurance levy' },
@@ -360,7 +360,7 @@ function TaxConfigSection() {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-xl px-4 py-2.5" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)' }}>
+          <div className="flex items-center justify-between gap-3 rounded-xl px-4 py-2.5" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)' }}>
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Total Effective Rate</span>
             <span className="text-xl font-bold font-mono" style={{ color: 'var(--color-teal)' }}>{tax.totalRatePct}</span>
           </div>
@@ -430,7 +430,7 @@ function TaxConfigSection() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={handleSave} disabled={saving}
               className="rounded-xl px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
               style={{ background: 'var(--color-teal)' }}>

@@ -15,6 +15,15 @@ export const RECENT_SALES = gql`
       idempotencyKey
       soldAt
       createdAt
+      refundRequest {
+        id
+        status
+        reason
+        reviewedByName
+        reviewNotes
+        createdAt
+        reviewedAt
+      }
       items {
         id
         productId
@@ -53,6 +62,15 @@ export const SALE_DETAIL = gql`
         amountPesewas
         amountFormatted
         momoReference
+      }
+      refundRequest {
+        id
+        status
+        reason
+        reviewedByName
+        reviewNotes
+        createdAt
+        reviewedAt
       }
       items {
         id
@@ -102,6 +120,24 @@ export const REQUEST_REFUND = gql`
       id
       status
       saleId
+    }
+  }
+`;
+
+export const MY_REFUND_REQUESTS = gql`
+  query MyRefundRequests {
+    myRefundRequests {
+      id
+      saleId
+      saleTotalFormatted
+      reason
+      status
+      requestedByName
+      reviewedByName
+      reviewNotes
+      reviewedAt
+      createdAt
+      saleItemCount
     }
   }
 `;

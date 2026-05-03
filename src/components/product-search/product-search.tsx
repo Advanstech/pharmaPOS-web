@@ -82,8 +82,8 @@ export function ProductSearch() {
           isBarcodeScan={isBarcodeScan}
         />
         {/* Hint row */}
-        <div className="flex items-center justify-between mt-2 px-0.5">
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex items-center justify-between mt-3 px-1">
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {showResults
               ? loading
                 ? 'Searching…'
@@ -92,7 +92,7 @@ export function ProductSearch() {
           </p>
           {isBarcodeScan && (
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
               style={{ background: 'rgba(0,109,119,0.1)', color: 'var(--color-teal)' }}
             >
               Barcode scan
@@ -101,7 +101,7 @@ export function ProductSearch() {
         </div>
         {showResults && !loading && quickMatch && quickStock && (
           <div
-            className="mt-2 rounded-lg px-3 py-2 text-xs"
+            className="mt-3 rounded-xl px-4 py-2.5 text-sm"
             style={{
               background:
                 quickStock.status === 'ok'

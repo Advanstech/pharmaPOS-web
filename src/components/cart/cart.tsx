@@ -49,11 +49,15 @@ export function Cart() {
 
   const [tenderMode, setTenderMode] = useState<'idle' | 'cash' | 'momo'>('idle');
   const [cashInput, setCashInput] = useState('');
+  const [momoInput, setMomoInput] = useState('');
   const cashInputRef = useRef<HTMLInputElement>(null);
+  const momoInputRef = useRef<HTMLInputElement>(null);
 
   const cashGiven = parseFloat(cashInput) || 0;
+  const momoGiven = parseFloat(momoInput) || grandTotal;
   const change = cashGiven - grandTotal;
   const hasEnough = cashGiven >= grandTotal;
+  const momoHasEnough = momoGiven >= grandTotal;
 
   // Smart quick-amount pills: exact + rounded-up options
   function getQuickAmounts(total: number): number[] {
@@ -79,6 +83,8 @@ export function Cart() {
   useEffect(() => {
     if (tenderMode === 'cash') {
       setTimeout(() => cashInputRef.current?.focus(), 80);
+    } else if (tenderMode === 'momo') {
+      setTimeout(() => momoInputRef.current?.focus(), 80);
     }
   }, [tenderMode]);
 
@@ -86,6 +92,7 @@ export function Cart() {
   useEffect(() => {
     setTenderMode('idle');
     setCashInput('');
+    setMomoInput('');
   }, [items.length]);
 
   const handleCashConfirm = () => {
@@ -96,8 +103,10 @@ export function Cart() {
   };
 
   const handleMomoConfirm = () => {
+    if (!momoHasEnough) return;
     void handleCheckout('MoMo');
     setTenderMode('idle');
+    setMomoInput('');
   };
 
   // Disable Lenis on cart — native scroll works correctly with CSS zoom
@@ -138,7 +147,7 @@ export function Cart() {
         : null,
     );
 
-    if (!isOnline) {
+    const recordOffline = async () => {
       await queueSale({
         id: idempotencyKey,
         branchId: user.branch_id,
@@ -156,6 +165,10 @@ export function Cart() {
       });
       setRecordedPendingSync(true);
       setIsReceiptOpen(true);
+    };
+
+    if (!isOnline) {
+      await recordOffline();
       return;
     }
 
@@ -192,9 +205,17 @@ export function Cart() {
       }
       setRecordedSaleId(data?.createSale?.id ?? null);
       setIsReceiptOpen(true);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not record sale.';
-      setCheckoutError(msg);
+    } catch (e: any) {
+      // If it's a network error, save offline instead of showing error
+      const isNetworkError = e.networkError || (e.message && e.message.toLowerCase().includes('network')) || e.message?.includes('Failed to fetch');
+      
+      if (isNetworkError) {
+        console.warn('[Cart] Network error during checkout, falling back to offline queue');
+        await recordOffline();
+      } else {
+        const msg = e instanceof Error ? e.message : 'Could not record sale.';
+        setCheckoutError(msg);
+      }
     }
   };
 
@@ -293,16 +314,16 @@ export function Cart() {
                 <div className="flex items-start gap-2">
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {item.name}
                     </p>
-                    <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      <GhsMoney amount={item.unitPriceGhs} className="text-xs" /> each
+                    <p className="text-sm font-mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                      <GhsMoney amount={item.unitPriceGhs} className="text-sm" /> each
                     </p>
                     {/* Ghana FDA: POM badge — visible before cashier attempts checkout */}
                     {item.requiresRx && (
                       <span
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold rounded px-1.5 py-0.5 mt-1"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold rounded px-1.5 py-0.5 mt-1.5"
                         style={{ background: 'rgba(217,119,6,0.1)', color: '#b45309' }}
                       >
                         ℞ POM — Rx verified
@@ -316,41 +337,41 @@ export function Cart() {
                   </div>
 
                   {/* Qty controls */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--surface-hover)]"
                       style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}
                       aria-label={`Decrease ${item.name}`}
                     >
-                      <Minus size={11} />
+                      <Minus size={14} />
                     </button>
-                    <span className="w-7 text-center text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="w-8 text-center text-base font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--surface-hover)]"
                       style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}
                       aria-label={`Increase ${item.name}`}
                     >
-                      <Plus size={11} />
+                      <Plus size={14} />
                     </button>
                   </div>
                 </div>
 
                 {/* Line total + remove */}
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-base font-bold font-mono" style={{ color: 'var(--text-primary)' }}>
                     <GhsMoney amount={item.unitPriceGhs * item.quantity} />
                   </p>
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-red-50"
                     style={{ color: '#dc2626' }}
                     aria-label={`Remove ${item.name}`}
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </motion.div>
@@ -363,22 +384,22 @@ export function Cart() {
       {/* Order summary — compact */}
       {items.length > 0 && (
         <div
-          className="px-4 pt-6 pb-1"
+          className="px-4 pt-6 pb-2"
           style={{ borderTop: '1px solid var(--surface-border)' }}
         >
-          <div className="space-y-0.5">
-            <div className="flex justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-sm" style={{ color: 'var(--text-secondary)' }}>
               <span>Subtotal</span>
-              <GhsMoney amount={subtotal} className="font-mono text-xs" />
+              <GhsMoney amount={subtotal} className="font-mono text-sm" />
             </div>
-            <div className="flex justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
+            <div className="flex justify-between text-sm" style={{ color: 'var(--text-secondary)' }}>
               <span>VAT 15%</span>
-              <GhsMoney amount={vat} className="font-mono text-xs" />
+              <GhsMoney amount={vat} className="font-mono text-sm" />
             </div>
-            <div className="flex justify-between font-bold text-sm pt-1"
+            <div className="flex justify-between font-bold text-lg pt-2 mt-1"
               style={{ borderTop: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
               <span>Total (GHS)</span>
-              <GhsMoney amount={grandTotal} className="font-mono font-bold text-sm" />
+              <GhsMoney amount={grandTotal} className="font-mono font-extrabold text-xl" />
             </div>
           </div>
         </div>
@@ -396,23 +417,23 @@ export function Cart() {
               {checkoutError}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setTenderMode('cash')}
               disabled={saleSubmitting}
-              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[48px] disabled:opacity-60"
-              style={{ background: 'linear-gradient(135deg,var(--color-teal-dark),var(--color-teal))', boxShadow: '0 2px 10px rgba(0,109,119,0.3)' }}
+              className="flex items-center justify-center gap-2.5 rounded-2xl font-bold text-base text-white transition-all active:scale-95 min-h-[56px] disabled:opacity-60"
+              style={{ background: 'linear-gradient(135deg,var(--color-teal-dark),var(--color-teal))', boxShadow: '0 4px 16px rgba(0,109,119,0.3)' }}
             >
-              <Banknote size={16} /> Cash
+              <Banknote size={18} /> Cash
             </button>
             <button
               onClick={() => setTenderMode('momo')}
               disabled={!isOnline || saleSubmitting}
-              className="flex items-center justify-center gap-2 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 min-h-[48px] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg,#c47d0e,var(--color-gold))', boxShadow: '0 2px 10px rgba(232,168,56,0.3)' }}
+              className="flex items-center justify-center gap-2.5 rounded-2xl font-bold text-base text-white transition-all active:scale-95 min-h-[56px] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#c47d0e,var(--color-gold))', boxShadow: '0 4px 16px rgba(232,168,56,0.3)' }}
               title={!isOnline ? 'MoMo requires internet' : undefined}
             >
-              <Smartphone size={16} /> MoMo
+              <Smartphone size={18} /> MoMo
             </button>
           </div>
 
@@ -611,54 +632,160 @@ export function Cart() {
               background: 'var(--surface-card)',
               boxShadow: '0 -8px 32px rgba(0,0,0,0.18)',
               borderTop: '1px solid var(--surface-border)',
+              maxHeight: '92%',
             }}
           >
-            <div className="flex justify-center pt-3 pb-1">
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full" style={{ background: 'var(--surface-border)' }} />
             </div>
 
-            <div className="px-5 py-5 space-y-4">
-              {/* Amount card */}
-              <div className="rounded-2xl px-5 py-5 text-center"
-                style={{ background: 'rgba(232,168,56,0.1)', border: '2px solid rgba(232,168,56,0.3)' }}>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#92400e' }}>
-                  MoMo amount to collect
-                </p>
-                <p className="text-4xl font-mono font-bold mt-2" style={{ color: '#78350f' }}>
-                  GH₵ {grandTotal.toFixed(2)}
-                </p>
-                <p className="text-xs mt-2 font-medium" style={{ color: '#b45309' }}>
-                  Confirm after customer approves on their phone
-                </p>
+            {/* Total reminder */}
+            <div className="px-5 pb-3 shrink-0" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    MoMo payment
+                  </p>
+                  <p className="text-2xl font-mono font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                    GH₵ {grandTotal.toFixed(2)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setTenderMode('idle'); setMomoInput(''); }}
+                  className="rounded-xl px-3 py-2 text-xs font-medium"
+                  style={{ border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+              {/* MoMo input */}
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: 'var(--text-muted)' }}>
+                  MoMo amount received
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold pointer-events-none"
+                    style={{ color: 'var(--text-muted)' }}>GH₵</span>
+                  <input
+                    ref={momoInputRef}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={momoInput}
+                    onChange={(e) => setMomoInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && momoHasEnough && handleMomoConfirm()}
+                    placeholder={grandTotal.toFixed(2)}
+                    className="w-full rounded-2xl pl-14 pr-4 py-4 text-2xl font-mono font-bold outline-none transition-all"
+                    style={{
+                      border: `2px solid ${momoInput ? (momoHasEnough ? '#16a34a' : '#dc2626') : 'var(--surface-border)'}`,
+                      background: 'var(--surface-base)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Buttons */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTenderMode('idle')}
-                  className="rounded-2xl px-5 py-4 text-sm font-semibold min-h-[56px]"
-                  style={{ border: '1.5px solid var(--surface-border)', color: 'var(--text-secondary)' }}
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMomoConfirm}
-                  disabled={saleSubmitting}
-                  className="flex-1 flex items-center justify-center gap-2.5 rounded-2xl py-4 text-base font-bold text-white transition-all active:scale-[0.98] min-h-[56px] disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg,#c47d0e,var(--color-gold))', boxShadow: '0 4px 16px rgba(232,168,56,0.4)' }}
-                >
-                  {saleSubmitting ? (
-                    <>
-                      <span className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                      Processing…
-                    </>
-                  ) : (
-                    <><Smartphone size={18} /> Confirm MoMo</>
-                  )}
-                </button>
+              {/* Quick-amount pills */}
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: 'var(--text-muted)' }}>Quick amounts</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickAmounts.map((amt) => {
+                    const isSelected = momoInput === amt.toFixed(2);
+                    const isExact = amt === grandTotal;
+                    return (
+                      <motion.button
+                        key={amt}
+                        type="button"
+                        whileTap={{ scale: 0.92 }}
+                        onClick={() => setMomoInput(amt.toFixed(2))}
+                        className="rounded-2xl px-4 py-2.5 text-sm font-bold font-mono transition-all min-h-[44px]"
+                        style={isSelected
+                          ? { background: '#c47d0e', color: '#fff', border: '2px solid #c47d0e', boxShadow: '0 2px 8px rgba(196,125,14,0.3)' }
+                          : { background: 'var(--surface-base)', color: 'var(--text-secondary)', border: '1.5px solid var(--surface-border)' }
+                        }
+                      >
+                        {isExact
+                          ? <span className="flex items-center gap-1.5"><Check size={13} /> Exact</span>
+                          : `GH₵ ${amt % 1 === 0 ? amt.toFixed(0) : amt.toFixed(2)}`}
+                      </motion.button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Amount status */}
+              <AnimatePresence>
+                {momoInput && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    className="rounded-2xl px-5 py-4"
+                    style={{
+                      background: momoHasEnough ? 'rgba(22,163,74,0.07)' : 'rgba(220,38,38,0.07)',
+                      border: `2px solid ${momoHasEnough ? 'rgba(22,163,74,0.22)' : 'rgba(220,38,38,0.22)'}`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide"
+                          style={{ color: momoHasEnough ? '#15803d' : '#b91c1c' }}>
+                          {momoHasEnough ? 'Amount confirmed' : 'Insufficient amount'}
+                        </p>
+                        <p className="text-3xl font-mono font-bold mt-1"
+                          style={{ color: momoHasEnough ? '#15803d' : '#b91c1c' }}>
+                          GH₵ {momoGiven.toFixed(2)}
+                        </p>
+                      </div>
+                      {momoHasEnough && momoGiven === grandTotal && (
+                        <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold"
+                          style={{ background: 'rgba(22,163,74,0.15)', color: '#15803d' }}>
+                          <Check size={13} /> Exact
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Sticky confirm button — always visible */}
+            <div className="shrink-0 px-5 pb-5 pt-3" style={{ borderTop: '1px solid var(--surface-border)' }}>
+              <button
+                type="button"
+                onClick={handleMomoConfirm}
+                disabled={!momoHasEnough || saleSubmitting}
+                className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-4 text-base font-bold text-white transition-all active:scale-[0.98] min-h-[56px] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: momoHasEnough
+                    ? 'linear-gradient(135deg,#c47d0e,var(--color-gold))'
+                    : 'var(--surface-border)',
+                  boxShadow: momoHasEnough ? '0 4px 16px rgba(196,125,14,0.4)' : 'none',
+                  color: momoHasEnough ? '#fff' : 'var(--text-muted)',
+                }}
+              >
+                {saleSubmitting ? (
+                  <>
+                    <span className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Processing…
+                  </>
+                ) : (
+                  <>
+                    <Smartphone size={18} />
+                    {momoHasEnough
+                      ? `Confirm MoMo · GH₵ ${momoGiven.toFixed(2)}`
+                      : `Enter GH₵ ${grandTotal.toFixed(2)} or more`}
+                  </>
+                )}
+              </button>
             </div>
           </motion.div>
         )}
@@ -674,6 +801,7 @@ export function Cart() {
         grandTotal={finalizedTotal}
         paymentMethod={paymentMethod}
         cashierName={user?.name ?? 'Cashier'}
+        branchName={user?.branchName ?? undefined}
         saleId={recordedSaleId}
         pendingSync={recordedPendingSync}
         customerReceiptLine={receiptCustomerLine}

@@ -20,6 +20,9 @@ import {
   Smartphone,
   CreditCard,
   SplitSquareHorizontal,
+  CheckCircle2,
+  XCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { SALE_DETAIL, REFUND_SALE, REQUEST_REFUND } from '@/lib/graphql/sales.queries';
@@ -30,6 +33,16 @@ import { ReceiptModal } from '@/components/pos/receipt-modal';
 import { SmartTextarea } from '@/components/ui/smart-textarea';
 import type { CartItem } from '@/types';
 import { useToast } from '@/components/ui/toast';
+
+type RefundSummary = {
+  id: string;
+  status: string;
+  reason: string;
+  reviewedByName?: string | null;
+  reviewNotes?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+};
 
 type SaleDetail = {
   id: string;
@@ -44,6 +57,7 @@ type SaleDetail = {
   idempotencyKey: string;
   soldAt?: string | null;
   createdAt: string;
+  refundRequest?: RefundSummary | null;
   tenders: Array<{
     method: string;
     amountPesewas: number;
@@ -119,7 +133,6 @@ export default function SaleDetailPage() {
   const [refundError, setRefundError] = useState<string | null>(null);
 
   const canRefund = user && ['owner', 'se_admin', 'manager'].includes(user.role);
-  const canRequestRefund = user && !canRefund; // cashiers, pharmacists, technicians
 
   const [refundSale, { loading: refunding }] = useMutation(REFUND_SALE, {
     onCompleted: () => { setShowRefund(false); setRefundReason(''); window.location.reload(); },
@@ -143,6 +156,9 @@ export default function SaleDetailPage() {
   });
 
   const sale = data?.sale;
+  const rr = sale?.refundRequest;
+  // Block re-request if already pending; allow only on COMPLETED with no prior request
+  const canRequestRefund = user && !canRefund && sale?.status === 'COMPLETED' && (!rr || rr.status === 'REJECTED');
   const subtotalGhs =
     sale != null ? Math.max(0, (sale.totalPesewas - sale.vatPesewas) / 100) : 0;
 
@@ -203,21 +219,37 @@ export default function SaleDetailPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {/* Refund/Request button — role-based */}
-              {(canRefund || canRequestRefund) && sale.status === 'COMPLETED' && !showRefund && (
+              {canRefund && sale.status === 'COMPLETED' && !showRefund && (
                 <button
                   type="button"
                   onClick={() => { setShowRefund(true); setRefundError(null); }}
                   className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-red-50"
                   style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
                 >
+                  <RotateCcw size={14} aria-hidden /> Refund Sale
+                </button>
+              )}
+              {canRequestRefund && !showRefund && (
+                <button
+                  type="button"
+                  onClick={() => { setShowRefund(true); setRefundError(null); }}
+                  className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-amber-50"
+                  style={{ color: '#d97706', borderColor: 'rgba(217,119,6,0.3)' }}
+                >
                   <RotateCcw size={14} aria-hidden />
-                  {canRefund ? 'Refund Sale' : 'Request Refund'}
+                  {rr?.status === 'REJECTED' ? 'Re-request Refund' : 'Request Refund'}
                 </button>
               )}
               {sale.status === 'REFUNDED' && (
                 <span className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold"
                   style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
                   <RotateCcw size={14} /> REFUNDED
+                </span>
+              )}
+              {rr?.status === 'PENDING' && (
+                <span className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold"
+                  style={{ background: 'rgba(234,179,8,0.1)', color: '#d97706', border: '1px solid rgba(234,179,8,0.3)' }}>
+                  <Clock size={14} /> Refund Pending
                 </span>
               )}
               <button
@@ -231,6 +263,51 @@ export default function SaleDetailPage() {
               </button>
             </div>
           </header>
+
+          {/* ── Refund status banner ── */}
+          {rr && !showRefund && (
+            <div className="mb-6 rounded-xl p-4"
+              style={{
+                background: rr.status === 'APPROVED' ? 'rgba(22,163,74,0.06)'
+                  : rr.status === 'REJECTED' ? 'rgba(220,38,38,0.06)'
+                  : 'rgba(234,179,8,0.06)',
+                border: `1px solid ${
+                  rr.status === 'APPROVED' ? 'rgba(22,163,74,0.25)'
+                  : rr.status === 'REJECTED' ? 'rgba(220,38,38,0.25)'
+                  : 'rgba(234,179,8,0.25)'}`,
+              }}>
+              <div className="flex items-start gap-3">
+                {rr.status === 'APPROVED'
+                  ? <CheckCircle2 size={18} className="shrink-0 mt-0.5" style={{ color: '#16a34a' }} />
+                  : rr.status === 'REJECTED'
+                  ? <XCircle size={18} className="shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
+                  : <ShieldAlert size={18} className="shrink-0 mt-0.5" style={{ color: '#d97706' }} />}
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{
+                    color: rr.status === 'APPROVED' ? '#16a34a' : rr.status === 'REJECTED' ? '#dc2626' : '#d97706'
+                  }}>
+                    {rr.status === 'APPROVED' ? 'Refund Approved & Processed'
+                      : rr.status === 'REJECTED' ? 'Refund Request Rejected'
+                      : 'Refund Request Pending Manager Approval'}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    Reason: {rr.reason}
+                  </p>
+                  {rr.reviewedByName && (
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                      Reviewed by <strong>{rr.reviewedByName}</strong>
+                      {rr.reviewedAt ? ` · ${accraDateTime(rr.reviewedAt)}` : ''}
+                    </p>
+                  )}
+                  {rr.reviewNotes && (
+                    <p className="text-xs mt-1 italic" style={{ color: 'var(--text-muted)' }}>
+                      Note: {rr.reviewNotes}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Refund confirmation panel */}
           {showRefund && (

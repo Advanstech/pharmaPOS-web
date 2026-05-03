@@ -34,6 +34,13 @@ interface SaleRow {
   status: string;
   soldAt?: string | null;
   createdAt: string;
+  refundRequest?: {
+    id: string;
+    status: string;
+    reason: string;
+    reviewedByName?: string | null;
+    reviewNotes?: string | null;
+  } | null;
   items: Array<{
     productId: string;
     productName: string;
@@ -223,9 +230,10 @@ export default function TransactionsPage() {
     if (!canQueryRecent) return [];
     const rows = data?.recentSales ?? [];
     if (!user) return [];
-    const completed = rows.filter((s) => s.status === 'COMPLETED');
-    if (branchWideSales) return completed;
-    return completed.filter((s) => s.cashierId === user.id);
+    // Include REFUNDED so staff can see outcome of their refund requests
+    const relevant = rows.filter((s) => s.status === 'COMPLETED' || s.status === 'REFUNDED');
+    if (branchWideSales) return relevant;
+    return relevant.filter((s) => s.cashierId === user.id);
   }, [data, user, canQueryRecent, branchWideSales]);
 
   const branchContextLine = useMemo(() => {
@@ -708,6 +716,22 @@ export default function TransactionsPage() {
                           <span>{tx.id.slice(0, 8)}…</span>
                           <ChevronRight size={14} className="opacity-70 transition-transform group-hover:translate-x-0.5" aria-hidden />
                         </Link>
+                        {/* Refund status badge */}
+                        {tx.status === 'REFUNDED' && (
+                          <span className="mt-1 flex items-center gap-1 text-[10px] font-bold" style={{ color: '#dc2626' }}>
+                            <RotateCcw size={9} /> REFUNDED
+                          </span>
+                        )}
+                        {tx.refundRequest?.status === 'PENDING' && (
+                          <span className="mt-1 flex items-center gap-1 text-[10px] font-bold" style={{ color: '#d97706' }}>
+                            <Clock size={9} /> Refund pending
+                          </span>
+                        )}
+                        {tx.refundRequest?.status === 'REJECTED' && tx.status !== 'REFUNDED' && (
+                          <span className="mt-1 flex items-center gap-1 text-[10px] font-bold" style={{ color: '#6b7280' }}>
+                            <XCircle size={9} /> Refund rejected
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3" style={{ color: 'var(--text-muted)' }}>
                         <span className="inline-flex items-center gap-1.5">

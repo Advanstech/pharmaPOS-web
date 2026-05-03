@@ -7,7 +7,7 @@ import {
   ArrowLeft, RotateCcw, CheckCircle2, XCircle, Clock,
   ChevronRight, Receipt,
 } from 'lucide-react';
-import { REFUND_REQUESTS } from '@/lib/graphql/sales.queries';
+import { REFUND_REQUESTS, MY_REFUND_REQUESTS } from '@/lib/graphql/sales.queries';
 import { useAuthStore } from '@/lib/store/auth.store';
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; icon: typeof Clock }> = {
@@ -36,16 +36,25 @@ function fmtDate(iso: string) {
   });
 }
 
+const MANAGER_ROLES = ['owner', 'se_admin', 'manager', 'head_pharmacist'];
+
 export default function RefundsPage() {
   const user = useAuthStore(s => s.user);
+  const isManager = MANAGER_ROLES.includes(user?.role ?? '');
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
-  const { data, loading } = useQuery<{ refundRequests: RefundRequest[] }>(
+  const { data: mgrData, loading: mgrLoading } = useQuery<{ refundRequests: RefundRequest[] }>(
     REFUND_REQUESTS,
-    { fetchPolicy: 'cache-and-network', pollInterval: 30_000 },
+    { fetchPolicy: 'cache-and-network', pollInterval: 30_000, skip: !isManager },
   );
 
-  const all = data?.refundRequests ?? [];
+  const { data: myData, loading: myLoading } = useQuery<{ myRefundRequests: RefundRequest[] }>(
+    MY_REFUND_REQUESTS,
+    { fetchPolicy: 'cache-and-network', pollInterval: 30_000, skip: isManager },
+  );
+
+  const loading = isManager ? mgrLoading : myLoading;
+  const all = isManager ? (mgrData?.refundRequests ?? []) : (myData?.myRefundRequests ?? []);
   const filtered = filter === 'ALL' ? all : all.filter(r => r.status === filter);
 
   const counts = {
@@ -79,7 +88,9 @@ export default function RefundsPage() {
                 </h1>
               </div>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Review, approve or reject refund requests from your team
+                {isManager
+                  ? 'Review, approve or reject refund requests from your team'
+                  : 'Track the status of refund requests you have submitted'}
               </p>
             </div>
           </div>
@@ -164,7 +175,9 @@ export default function RefundsPage() {
                 No {filter === 'ALL' ? '' : filter.toLowerCase() + ' '}refund requests
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                Requests from cashiers and pharmacists will appear here
+                {isManager
+                  ? 'Requests from cashiers and pharmacists will appear here'
+                  : 'Go to a sale and tap “Request Refund” to get started'}
               </p>
             </div>
           )}
@@ -192,9 +205,11 @@ export default function RefundsPage() {
                     {req.reason}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      By <strong>{req.requestedByName}</strong>
-                    </span>
+                    {isManager && (
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        By <strong>{req.requestedByName}</strong>
+                      </span>
+                    )}
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       · {req.saleItemCount} item{req.saleItemCount !== 1 ? 's' : ''}
                     </span>
@@ -237,7 +252,9 @@ export default function RefundsPage() {
         </div>
 
         <p className="mt-4 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          Auto-refreshes every 30 seconds · Only showing requests for your branch
+          {isManager
+            ? 'Auto-refreshes every 30 seconds · Showing all requests for your branch'
+            : 'Auto-refreshes every 30 seconds · Showing only your submitted requests'}
         </p>
       </div>
     </div>

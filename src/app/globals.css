@@ -21,13 +21,13 @@
   --color-stock-low:  #dc2626;
 
   /* Surfaces */
-  --surface-base:     #F8FAFB;
+  --surface-base:     #F3F6F8;
   --surface-card:     #FFFFFF;
-  --surface-border:   #E8EDF0;
-  --surface-hover:    #F0F7F8;
+  --surface-border:   #E2E8EB;
+  --surface-hover:    #E9F0F2;
 
   /* Text */
-  --text-primary:     #0D1B1E;
+  --text-primary:     #112226;
   --text-secondary:   #4A6670;
   --text-muted:       #8BA3AB;
 
@@ -272,6 +272,7 @@ html.dark .glass {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  color: var(--color-teal);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -31,14 +31,16 @@ export function ClassificationBadge({ classification }: ClassificationBadgeProps
 
   return (
     <span
-      className="inline-flex max-w-full shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wide sm:gap-1 sm:px-2 sm:text-[11px]"
-      style={{ background: cfg.bg, color: cfg.text }}
+      className="inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wider"
+      style={{
+        background: cfg.bg,
+        color: cfg.text,
+        borderColor: cfg.text,
+      }}
+      title={cfg.label}
       aria-label={`Classification: ${cfg.label}`}
     >
-      <span aria-hidden="true" className="shrink-0 text-[0.65rem] sm:text-[0.7rem]">
-        {cfg.icon}
-      </span>
-      <span className="truncate">{cfg.label}</span>
+      {cfg.label}
     </span>
   );
 }

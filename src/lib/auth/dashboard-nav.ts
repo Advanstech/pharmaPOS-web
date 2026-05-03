@@ -91,13 +91,13 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     href: '/dashboard/reports',
     label: 'Reports',
     icon: BarChart3,
-    roles: ['owner', 'se_admin', 'manager'],
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist'],
   },
   {
     href: '/dashboard/accounting',
     label: 'Accounting',
     icon: Landmark,
-    roles: ['owner', 'se_admin', 'manager'],
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist'],
   },
   {
     href: '/dashboard/expenses',
@@ -175,13 +175,13 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     href: '/dashboard/refunds',
     label: 'Refunds',
     icon: RotateCcw,
-    roles: ['owner', 'se_admin', 'manager'],
+    roles: ['owner', 'se_admin', 'manager', 'head_pharmacist'],
   },
   {
     href: '/dashboard/end-of-day',
     label: 'End of Day',
     icon: CalendarCheck,
-    roles: ['owner', 'se_admin', 'manager', 'cashier', 'chemical_cashier', 'head_pharmacist'],
+    roles: ['owner', 'se_admin', 'manager', 'cashier', 'chemical_cashier', 'head_pharmacist', 'pharmacist', 'technician'],
   },
   {
     href: '/dashboard/transfers',

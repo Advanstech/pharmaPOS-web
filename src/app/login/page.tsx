@@ -51,14 +51,14 @@ const S = {
     zIndex: 20,
   },
   root: {
-    position: 'fixed' as const,
-    inset: 0,
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '24px',
+    padding: '24px 16px',
     background: 'var(--surface-base)',
-    overflow: 'hidden',
+    overflowX: 'hidden' as const,
+    overflowY: 'auto' as const,
     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
   },
   blob1: {
@@ -121,7 +121,7 @@ const S = {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
-    padding: '36px 40px 24px',
+    padding: '32px clamp(20px, 5vw, 40px) 24px',
     gap: 12,
   },
   logoIcon: {
@@ -155,10 +155,10 @@ const S = {
   divider: {
     height: 1,
     background: 'linear-gradient(90deg, transparent, var(--surface-border) 20%, var(--surface-border) 80%, transparent)',
-    margin: '0 40px',
+    margin: '0 clamp(20px, 5vw, 40px)',
   },
   form: {
-    padding: '28px 40px 32px',
+    padding: '28px clamp(20px, 5vw, 40px) 32px',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: 18,
@@ -258,16 +258,19 @@ const S = {
   forgotRow: {
     display: 'flex',
     gap: 8,
+    flexWrap: 'wrap' as const,
   },
   forgotSendBtn: {
     border: '1px solid var(--surface-border)',
     background: 'var(--surface-card)',
     color: 'var(--text-primary)',
     borderRadius: 8,
+    height: 42,
     fontSize: 12,
     fontWeight: 600,
     padding: '0 12px',
     cursor: 'pointer',
+    flex: '1 1 120px',
   },
   forgotSuccess: {
     margin: 0,
@@ -330,10 +333,12 @@ const S = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    padding: '10px 40px 20px',
+    padding: '10px clamp(20px, 5vw, 40px) 20px',
     fontSize: 11,
     color: 'var(--text-muted)',
     letterSpacing: '0.02em',
+    flexWrap: 'wrap' as const,
+    textAlign: 'center' as const,
   },
   complianceDot: {
     width: 6,
@@ -597,7 +602,7 @@ export default function LoginPage() {
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="you@azzaypharmacy.com"
-                      style={{ ...S.input, height: 42, fontSize: 14 }}
+                      style={{ ...S.input, height: 42, fontSize: 14, flex: '1 1 220px' }}
                     />
                     <button
                       type="button"

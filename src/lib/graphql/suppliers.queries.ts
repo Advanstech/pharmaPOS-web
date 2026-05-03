@@ -15,6 +15,8 @@ export const SUPPLIER_RESTOCK_WATCH = gql`
     supplierRestockWatch {
       supplierId
       supplierName
+      supplierContactName
+      supplierAddress
       supplierPhone
       supplierEmail
       supplierAiScore
@@ -75,6 +77,7 @@ export const SUPPLIER_WITH_PRODUCTS_QUERY = gql`
         isActive
         quantityOnHand
         reorderLevel
+        nearestExpiry
         stockStatus
         sold7d
         sold30d

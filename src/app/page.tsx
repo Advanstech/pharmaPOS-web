@@ -108,9 +108,9 @@ export default function LandingPage() {
             <motion.div variants={fadeInUp}>
               <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-[1.1]" style={{ color: 'var(--text-primary)' }}>
                 Intelligent Pharmacy POS <br />
-                <span className="inline-flex flex-wrap justify-center items-center">
+                <span className="inline-flex flex-wrap justify-center items-baseline">
                   Built for&nbsp;
-                  <span className="text-gradient-teal inline-grid text-left">
+                  <span className="text-gradient-teal inline-grid text-left pb-2">
                     <span className="invisible col-start-1 row-start-1">Compliance.</span>
                     <AnimatePresence mode="popLayout">
                       <motion.span

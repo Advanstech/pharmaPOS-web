@@ -40,9 +40,20 @@ export async function syncPendingSales(client: ApolloClient): Promise<number> {
       });
       await markSaleSynced(sale.id);
       synced += 1;
-    } catch (e) {
+      console.info('[syncPendingSales] successfully synced', sale.id);
+    } catch (e: any) {
       console.error('[syncPendingSales] failed for', sale.id, e);
-      break;
+      
+      // If it's a network error, stop trying others
+      if (e.networkError || (e.message && e.message.toLowerCase().includes('network'))) {
+        console.warn('[syncPendingSales] network error detected, stopping sync loop');
+        break;
+      }
+      
+      // If it's a GraphQL/Validation error, it might be a "poison pill" (e.g. product deleted)
+      // We should probably mark it as "failed" or just skip it for now.
+      // For now, we continue to the next one so one bad sale doesn't block the queue.
+      continue;
     }
   }
   return synced;
