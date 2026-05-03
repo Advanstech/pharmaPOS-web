@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -316,6 +316,8 @@ function CloseRegisterForm({ onSuccess }: { onSuccess: (r: EodRecord) => void })
   const [notes, setNotes] = useState('');
   const [discrepancy, setDiscrepancy] = useState('');
   const [err, setErr] = useState('');
+  const [notesFocused, setNotesFocused] = useState(false);
+  const [discrepancyFocused, setDiscrepancyFocused] = useState(false);
 
   const cashPesewas = Math.round((parseFloat(cash) || 0) * 100);
   const momoPesewas = Math.round((parseFloat(momo) || 0) * 100);
@@ -486,9 +488,29 @@ function CloseRegisterForm({ onSuccess }: { onSuccess: (r: EodRecord) => void })
         <textarea
           rows={2} placeholder="Any handover notes for the next shift…"
           value={notes} onChange={e => setNotes(e.target.value)}
+          onFocus={() => setNotesFocused(true)} onBlur={() => setTimeout(() => setNotesFocused(false), 150)}
           className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none resize-none"
           style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
         />
+        {notesFocused && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[
+              'All items balanced and accounted for.',
+              'Smooth shift, no incidents.',
+              'Low stock on some items — check inventory.',
+              'Pending customer order to follow up.',
+              'Float carried over to next shift.',
+              'Equipment issue reported — needs attention.',
+            ].map(s => (
+              <button key={s} type="button"
+                onClick={() => setNotes(n => n ? `${n.trimEnd()} ${s}` : s)}
+                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all hover:opacity-80 active:scale-95"
+                style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Discrepancy */}
@@ -499,9 +521,30 @@ function CloseRegisterForm({ onSuccess }: { onSuccess: (r: EodRecord) => void })
         <textarea
           rows={2} placeholder="Explain any cash shortage…"
           value={discrepancy} onChange={e => setDiscrepancy(e.target.value)}
+          onFocus={() => setDiscrepancyFocused(true)} onBlur={() => setTimeout(() => setDiscrepancyFocused(false), 150)}
           className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none resize-none"
           style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
         />
+        {discrepancyFocused && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[
+              'Change given in error.',
+              'Refund issued without system entry.',
+              'Till opened for non-sale transaction.',
+              'Counterfeit note received.',
+              'Cash used for petty expense — receipt available.',
+              'Pricing error corrected manually.',
+              'Customer overpaid — change not collected.',
+            ].map(s => (
+              <button key={s} type="button"
+                onClick={() => setDiscrepancy(d => d ? `${d.trimEnd()} ${s}` : s)}
+                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all hover:opacity-80 active:scale-95"
+                style={{ background: 'rgba(220,38,38,0.04)', borderColor: 'rgba(220,38,38,0.2)', color: '#b91c1c' }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {err && (

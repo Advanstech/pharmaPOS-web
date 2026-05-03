@@ -153,6 +153,13 @@ export default function ReceiveStockPage() {
   const calculatedTotal = lines.reduce((sum, line) => sum + (line.quantity * line.unitCostPesewas), 0);
   const calculatedTotalGhs = (calculatedTotal / 100).toFixed(2);
 
+  // Generate batch number from invoice number + date
+  const autoBatch = () => {
+    const inv = invoiceNumber.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 12);
+    const date = invoiceDate.replace(/-/g, '').slice(2); // YYMMDD
+    return inv && date ? `${inv}-${date}` : '';
+  };
+
   const addLine = (p: ProductHit) => {
     if (lines.some(l => l.productId === p.id)) return;
     setLines(prev => [...prev, { 
@@ -160,7 +167,7 @@ export default function ReceiveStockPage() {
       productName: p.name, 
       quantity: 1, 
       unitCostPesewas: p.unitPrice,
-      batchNumber: '', 
+      batchNumber: autoBatch(),
       expiryDate: '',
       imageUrl: p.image?.urlThumb || p.image?.cdnUrl,
     }]);
@@ -622,8 +629,18 @@ export default function ReceiveStockPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="mb-0.5 block text-[10px] font-bold text-content-muted">Batch *</label>
-                        <input value={line.batchNumber} onChange={e => updateLine(idx, 'batchNumber', e.target.value)} placeholder="BATCH-001"
-                          className="w-full rounded border border-surface-border bg-surface-card px-2 py-1.5 text-sm focus:border-teal focus:outline-none" />
+                        <div className="flex gap-1">
+                          <input value={line.batchNumber} onChange={e => updateLine(idx, 'batchNumber', e.target.value)}
+                            placeholder={autoBatch() || 'BATCH-001'}
+                            className="w-full rounded border border-surface-border bg-surface-card px-2 py-1.5 text-sm font-mono focus:border-teal focus:outline-none" />
+                          {!line.batchNumber && autoBatch() && (
+                            <button type="button" onClick={() => updateLine(idx, 'batchNumber', autoBatch())}
+                              title="Auto-fill batch number"
+                              className="shrink-0 rounded border border-teal/30 bg-teal/5 px-1.5 text-[10px] font-bold text-teal hover:bg-teal/10">
+                              Auto
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="mb-0.5 block text-[10px] font-bold text-content-muted">Expiry *</label>

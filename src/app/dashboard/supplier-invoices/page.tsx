@@ -468,7 +468,7 @@ export default function SupplierInvoicesPage() {
                     )}
 
                     <Link
-                      href={`/dashboard/inventory/receive?grn=${invoice.grnId}`}
+                      href={`/dashboard/accounting/invoices/${invoice.id}`}
                       className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all hover:scale-105"
                       style={{ 
                         background: 'rgba(13,148,136,0.06)', 
@@ -656,9 +656,10 @@ function PaymentModal({ invoice, detail, onClose, onSuccess }: PaymentModalProps
             >
               <option value="BANK_TRANSFER">Bank Transfer</option>
               <option value="CASH">Cash</option>
-              <option value="MOMO">Mobile Money</option>
+              <option value="MTN_MOMO">MTN MoMo</option>
+              <option value="VODAFONE_CASH">Vodafone Cash</option>
+              <option value="AIRTELTIGO_MONEY">AirtelTigo Money</option>
               <option value="CHEQUE">Cheque</option>
-              <option value="CARD">Card Payment</option>
             </select>
           </div>
 

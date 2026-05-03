@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import { ArrowLeft, CheckCircle, XCircle, Loader2, AlertTriangle, Search } from 'lucide-react';
@@ -82,16 +82,18 @@ export default function OcrReviewPage() {
     variables: { id: jobId },
     pollInterval: 2000,
     fetchPolicy: 'network-only',
-    onCompleted: (d) => {
-      if (d?.invoiceOcrJob?.status === 'completed') {
-        const loadedItems = d.invoiceOcrJob.extractedData?.items || [];
-        triggerAutoSearch(loadedItems);
-      }
-    },
   });
 
   const job = data?.invoiceOcrJob;
   const ed = job?.extractedData;
+
+  // Trigger auto-search once when job completes
+  useEffect(() => {
+    if (job?.status === 'completed') {
+      const loadedItems = ed?.items || [];
+      triggerAutoSearch(loadedItems);
+    }
+  }, [job?.status, ed?.items, triggerAutoSearch]);
 
   // Derive values — use overrides if set, otherwise use extracted data
   const invoiceNumber = overrides.invoiceNumber ?? ed?.invoiceNumber ?? '';
