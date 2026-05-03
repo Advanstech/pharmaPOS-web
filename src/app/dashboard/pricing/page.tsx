@@ -64,7 +64,15 @@ export default function PricingPage() {
     SUPPLIERS_LIST_QUERY,
     { skip: !canManage, fetchPolicy: 'cache-and-network' },
   );
-  const suppliers = suppliersData?.suppliers?.filter(s => s.isActive) ?? [];
+  const suppliers = useMemo(() => {
+    const unique = new Map<string, { id: string; name: string; isActive: boolean }>();
+    for (const s of suppliersData?.suppliers ?? []) {
+      if (s.isActive && !unique.has(s.id)) {
+        unique.set(s.id, s);
+      }
+    }
+    return Array.from(unique.values());
+  }, [suppliersData]);
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
 
   // Search products (show all with empty query by using a space)
