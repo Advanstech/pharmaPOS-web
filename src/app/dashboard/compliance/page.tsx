@@ -58,8 +58,8 @@ export default function CompliancePage() {
   ];
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Compliance</h1>
           <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>Ghana FDA audit trail · GMDC validation log</p>
@@ -118,7 +118,7 @@ export default function CompliancePage() {
       </div>
 
       {/* Audit log */}
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
+      <div className="rounded-xl overflow-x-auto" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Audit log</h2>
           <div className="flex gap-1 rounded-lg p-1" style={{ border: '1px solid var(--surface-border)' }}>

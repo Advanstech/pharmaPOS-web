@@ -61,16 +61,18 @@ export function Cart() {
 
   // Smart quick-amount pills: exact + rounded-up options
   function getQuickAmounts(total: number): number[] {
-    const ceil1 = Math.ceil(total);
-    const ceil5 = Math.ceil(total / 5) * 5;
-    const ceil10 = Math.ceil(total / 10) * 10;
-    const ceil20 = Math.ceil(total / 20) * 20;
-    const ceil50 = Math.ceil(total / 50) * 50;
+    // Round total to 2 decimals to avoid floating point issues
+    const roundedTotal = Math.round(total * 100) / 100;
+    const ceil1 = Math.ceil(roundedTotal);
+    const ceil5 = Math.ceil(roundedTotal / 5) * 5;
+    const ceil10 = Math.ceil(roundedTotal / 10) * 10;
+    const ceil20 = Math.ceil(roundedTotal / 20) * 20;
+    const ceil50 = Math.ceil(roundedTotal / 50) * 50;
     const seen = new Set<number>();
     const pills: number[] = [];
-    for (const v of [total, ceil1, ceil5, ceil10, ceil20, ceil50]) {
+    for (const v of [roundedTotal, ceil1, ceil5, ceil10, ceil20, ceil50]) {
       const rounded = Math.round(v * 100) / 100;
-      if (!seen.has(rounded) && rounded >= total) {
+      if (!seen.has(rounded) && rounded >= roundedTotal - 0.001) {
         seen.add(rounded);
         pills.push(rounded);
       }
@@ -526,7 +528,7 @@ export function Cart() {
                 <div className="flex flex-wrap gap-2">
                   {quickAmounts.map((amt) => {
                     const isSelected = cashInput === amt.toFixed(2);
-                    const isExact = amt === grandTotal;
+                    const isExact = Math.abs(amt - grandTotal) < 0.001;
                     return (
                       <motion.button
                         key={amt}

@@ -4,9 +4,27 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, Camera, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useQuery } from '@apollo/client';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { SUPPLIERS_LIST_QUERY } from '@/lib/graphql/suppliers.queries';
 
-const ALLOWED = new Set(['application/pdf','image/png','image/jpeg','image/jpg','image/webp','image/heic','image/heif','image/tiff','image/bmp']);
+const ALLOWED = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/tiff',
+  'image/bmp',
+]);
+
+interface SupplierOption {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
 
 export default function InvoiceUploadPage() {
   const router = useRouter();
@@ -16,27 +34,52 @@ export default function InvoiceUploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { data: suppData, loading: suppLoading } = useQuery<{ suppliers: SupplierOption[] }>(
+    SUPPLIERS_LIST_QUERY,
+    { fetchPolicy: 'cache-and-network' },
+  );
+  const suppliers = (suppData?.suppliers ?? []).filter((s) => s.isActive);
+
   const validate = (f: File) => {
     const ext = f.name.toLowerCase();
-    const ok = ALLOWED.has(f.type) || ['.pdf','.png','.jpg','.jpeg','.webp','.heic','.tiff','.bmp'].some(e => ext.endsWith(e));
-    if (!ok) { setError('Please upload a PDF or image file (JPG, PNG, WEBP, HEIC, TIFF, BMP)'); return; }
-    if (f.size > 10 * 1024 * 1024) { setError('File size must be less than 10MB'); return; }
-    setFile(f); setError(null);
+    const ok =
+      ALLOWED.has(f.type) ||
+      ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.heic', '.tiff', '.bmp'].some((e) =>
+        ext.endsWith(e),
+      );
+    if (!ok) {
+      setError('Please upload a PDF or image file (JPG, PNG, WEBP, HEIC, TIFF, BMP)');
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+    setFile(f);
+    setError(null);
   };
 
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     setDragActive(e.type === 'dragenter' || e.type === 'dragover');
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); e.stopPropagation(); setDragActive(false);
-    const f = e.dataTransfer.files?.[0]; if (f) validate(f);
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) validate(f);
   };
 
   const handleUpload = async () => {
-    if (!file) { setError('Please select a file'); return; }
-    setUploading(true); setError(null);
+    if (!file) {
+      setError('Please select a file');
+      return;
+    }
+    setUploading(true);
+    setError(null);
 
     try {
       const token = useAuthStore.getState().accessToken;
@@ -47,9 +90,7 @@ export default function InvoiceUploadPage() {
 
       const body = new FormData();
       body.append('file', file, file.name);
-      if (supplierId.trim()) body.append('supplierId', supplierId.trim());
-
-      console.log(`POST ${url} — ${file.name} (${(file.size/1024).toFixed(1)} KB, ${file.type})`);
+      if (supplierId) body.append('supplierId', supplierId);
 
       const res = await fetch(url, {
         method: 'POST',
@@ -58,7 +99,6 @@ export default function InvoiceUploadPage() {
       });
 
       const json = await res.json();
-      console.log('Response:', json);
 
       if (!res.ok) throw new Error(json?.message || `Upload failed (${res.status})`);
 
@@ -70,12 +110,17 @@ export default function InvoiceUploadPage() {
   };
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6">
-        <Link href="/dashboard/inventory/receive" className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline">
+        <Link
+          href="/dashboard/inventory/receive"
+          className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline"
+        >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Back to Inventory
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-content-primary">Upload Supplier Invoice</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-content-primary">
+          Upload Supplier Invoice
+        </h1>
         <p className="mt-1 text-sm font-medium text-content-secondary">
           Upload a supplier invoice for AI-powered OCR processing and automatic GRN creation
         </p>
@@ -92,23 +137,54 @@ export default function InvoiceUploadPage() {
           </div>
         )}
 
+        {/* Supplier selector */}
         <div className="mb-6">
-          <label className="mb-2 block text-sm font-semibold text-content-primary">Supplier (Optional)</label>
-          <input
-            type="text" value={supplierId} onChange={e => setSupplierId(e.target.value)}
-            placeholder="Enter supplier ID or leave blank for auto-detection"
-            className="w-full rounded-lg border border-surface-border px-4 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/20"
-            style={{ background: 'var(--surface-card)' }} disabled={uploading}
-          />
+          <label
+            htmlFor="supplier-select"
+            className="mb-2 block text-sm font-semibold text-content-primary"
+          >
+            Supplier{' '}
+            <span className="font-normal text-content-secondary">(optional — auto-detected from invoice)</span>
+          </label>
+          <select
+            id="supplier-select"
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            disabled={uploading || suppLoading}
+            className="w-full rounded-lg border border-surface-border px-4 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/20 disabled:opacity-60"
+            style={{ background: 'var(--surface-card)' }}
+          >
+            <option value="">— Auto-detect from invoice —</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
 
+        {/* Drop zone */}
         <div
-          className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all ${dragActive ? 'border-teal bg-teal/5' : 'border-surface-border hover:border-teal/50'}`}
+          className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+            dragActive ? 'border-teal bg-teal/5' : 'border-surface-border hover:border-teal/50'
+          }`}
           style={{ background: 'var(--surface-card)' }}
-          onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
         >
-          <input type="file" id="file-upload" className="hidden" accept="image/*,.pdf"
-            onChange={e => { const f = e.target.files?.[0]; if (f) validate(f); }} disabled={uploading} />
+          <input
+            type="file"
+            id="file-upload"
+            className="hidden"
+            accept="image/*,.pdf"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) validate(f);
+            }}
+            disabled={uploading}
+          />
 
           {file ? (
             <div className="space-y-4">
@@ -117,10 +193,18 @@ export default function InvoiceUploadPage() {
               </div>
               <div>
                 <p className="font-semibold text-content-primary">{file.name}</p>
-                <p className="text-sm text-content-secondary">{(file.size / 1024).toFixed(1)} KB · {file.type || 'unknown type'}</p>
+                <p className="text-sm text-content-secondary">
+                  {(file.size / 1024).toFixed(1)} KB · {file.type || 'unknown type'}
+                </p>
               </div>
               {!uploading && (
-                <button onClick={() => { setFile(null); setError(null); }} className="text-sm font-medium text-red-500 hover:text-red-600">
+                <button
+                  onClick={() => {
+                    setFile(null);
+                    setError(null);
+                  }}
+                  className="text-sm font-medium text-red-500 hover:text-red-600"
+                >
                   Remove file
                 </button>
               )}
@@ -134,15 +218,26 @@ export default function InvoiceUploadPage() {
                 <p className="font-semibold text-content-primary">Drag and drop your invoice here</p>
                 <p className="text-sm text-content-secondary">or click to browse files</p>
               </div>
-              <label htmlFor="file-upload" className="inline-block cursor-pointer rounded-lg bg-teal px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal/90">
+              <label
+                htmlFor="file-upload"
+                className="inline-block cursor-pointer rounded-lg bg-teal px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal/90"
+              >
                 Select File
               </label>
               <div className="flex items-center justify-center gap-4 text-sm text-content-secondary">
                 <span>or</span>
-                <button type="button" disabled={uploading}
+                <button
+                  type="button"
+                  disabled={uploading}
                   onClick={async () => {
-                    try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); s.getTracks().forEach(t => t.stop()); }
-                    catch { setError('Camera not available on this device'); }
+                    try {
+                      const s = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' },
+                      });
+                      s.getTracks().forEach((t) => t.stop());
+                    } catch {
+                      setError('Camera not available on this device');
+                    }
                   }}
                   className="inline-flex items-center gap-2 font-medium text-teal hover:text-teal/90"
                 >
@@ -155,22 +250,41 @@ export default function InvoiceUploadPage() {
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <Link href="/dashboard/inventory/receive"
+          <Link
+            href="/dashboard/inventory/receive"
             className="rounded-lg border border-surface-border px-6 py-2.5 text-sm font-semibold text-content-primary hover:bg-surface-hover"
-            style={{ background: 'var(--surface-card)' }}>
+            style={{ background: 'var(--surface-card)' }}
+          >
             Cancel
           </Link>
-          <button onClick={handleUpload} disabled={!file || uploading}
-            className="rounded-lg bg-teal px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal/90 disabled:cursor-not-allowed disabled:opacity-50">
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className="rounded-lg bg-teal px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             {uploading ? (
               <span className="flex items-center gap-2">
                 <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Processing...
               </span>
-            ) : 'Upload & Process'}
+            ) : (
+              'Upload & Process'
+            )}
           </button>
         </div>
       </div>

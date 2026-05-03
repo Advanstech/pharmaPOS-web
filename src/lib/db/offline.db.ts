@@ -62,3 +62,13 @@ export async function getPendingSales(): Promise<OfflineSale[]> {
 export async function markSaleSynced(id: string): Promise<void> {
   await db.pendingSales.update(id, { synced: 1 });
 }
+
+/** Delete a specific pending sale by ID */
+export async function deletePendingSale(id: string): Promise<void> {
+  await db.pendingSales.delete(id);
+}
+
+/** Clear all pending sales (useful when stuck sales are causing sync errors) */
+export async function clearAllPendingSales(): Promise<void> {
+  await db.pendingSales.clear();
+}

@@ -78,14 +78,14 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
       aria-disabled={isOutOfStock}
       aria-label={`${product.name}, ${formatGhs(product.unitPrice / 100)}`}
       className={cn(
-        'relative isolate flex h-[140px] min-h-[140px] max-h-[140px] cursor-pointer flex-row items-stretch gap-3 overflow-hidden rounded-[20px] border-2 bg-surface-card p-3 shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-teal/50',
+        'relative isolate flex h-[130px] min-h-[130px] max-h-[130px] cursor-pointer flex-row items-stretch gap-3 overflow-hidden rounded-[20px] border-2 bg-surface-card p-3 shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-teal/50',
         isOutOfStock
           ? 'cursor-not-allowed border-surface-border bg-surface-base opacity-80 grayscale'
           : 'border-surface-border hover:border-teal/30 hover:shadow-lg',
       )}
     >
       {/* Left: thumbnail — glare only here so it never covers text */}
-      <div className="relative h-full min-h-0 w-[110px] shrink-0 overflow-hidden rounded-[14px] border border-surface-border bg-surface-hover shadow-inner sm:w-[120px]">
+      <div className="relative h-full min-h-0 w-[100px] shrink-0 overflow-hidden rounded-[14px] border border-surface-border bg-surface-hover shadow-inner sm:w-[110px]">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-7 rounded-t-[13px] bg-gradient-to-b from-white/25 to-transparent dark:from-white/10" />
         <ProductImage
           src={product.image?.urlThumb ?? product.image?.cdnUrl}
@@ -120,18 +120,18 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
         </div>
 
         <div className="min-h-0 min-w-0 overflow-hidden">
-          <h3 className="line-clamp-2 break-words text-[15px] font-extrabold leading-tight tracking-tight text-content-primary sm:text-[16px]">
+          <h3 className="line-clamp-2 break-words text-[14px] font-extrabold leading-snug tracking-tight text-content-primary sm:text-[15px]">
             {product.name}
           </h3>
           {product.genericName ? (
-            <p className="mt-px line-clamp-1 text-[12px] font-medium leading-tight text-content-secondary">
+            <p className="mt-0.5 line-clamp-1 text-[11px] font-medium leading-tight text-content-secondary">
               {product.genericName}
             </p>
           ) : null}
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
             {product.category?.name ? (
               <span
-                className="max-w-full truncate rounded-full border px-2 py-0.5 text-[11px]"
+                className="max-w-full truncate rounded-full border px-1.5 py-0.5 text-[10px]"
                 style={{
                   background: 'var(--surface-base)',
                   color: 'var(--text-muted)',
@@ -144,7 +144,7 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
             ) : null}
             {product.supplier?.aiScore != null ? (
               <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                 style={{
                   background: 'rgba(0,109,119,0.1)',
                   color:
@@ -155,14 +155,14 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
                         : '#b91c1c',
                 }}
               >
-                <BrainCircuit size={12} /> AI {product.supplier.aiScore}
+                <BrainCircuit size={10} /> AI {product.supplier.aiScore}
               </span>
             ) : null}
           </div>
         </div>
 
         <div
-          className="flex shrink-0 items-end justify-between gap-1 border-t pt-1.5"
+          className="flex shrink-0 items-end justify-between gap-2 border-t pt-2"
           style={{ borderColor: 'var(--surface-border)' }}
         >
           <div className="min-w-0 flex-1 max-w-[calc(100%-50px)]">
@@ -172,7 +172,7 @@ export function ProductCard({ product, onSelect, shouldReduceMotion }: ProductCa
                 className="text-[15px] font-extrabold leading-none tracking-tight text-teal sm:text-[17px]"
               />
             </div>
-            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0 text-[11px] font-bold leading-tight text-content-muted">
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0 text-[11px] font-bold leading-tight text-content-muted">
               <Store size={12} className="shrink-0" />
               <span
                 className={cn(

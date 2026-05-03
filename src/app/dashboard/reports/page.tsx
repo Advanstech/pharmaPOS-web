@@ -62,7 +62,7 @@ export default function ReportsPage() {
       {/* ── Hero ── */}
       <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.1) 0%, rgba(6,182,212,0.05) 50%, rgba(59,130,246,0.08) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
         <div className="mx-auto max-w-[1440px] px-4 pt-5 pb-4 md:px-6">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <Link href="/dashboard" className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Dashboard</Link>
               <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Sales Analytics</h1>
@@ -94,7 +94,7 @@ export default function ReportsPage() {
 
         {curr && <>
           {/* ── KPI Strip ── */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard icon={DollarSign} label="Revenue" value={curr.totalRevenueFormatted} delta={revDelta} color="#0d9488" />
             <KpiCard icon={ShoppingCart} label="Sales" value={String(curr.salesCount)} delta={salesDelta} color="#3b82f6" />
             <KpiCard icon={Receipt} label="VAT Collected" value={curr.vatFormatted} color="#f59e0b" />

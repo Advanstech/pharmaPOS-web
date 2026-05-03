@@ -41,7 +41,7 @@ export default function DashboardSettingsPage() {
   }, []);
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Settings</h1>
       <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
         Appearance, display, and device preferences. Saved locally on this device.

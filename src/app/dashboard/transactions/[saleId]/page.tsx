@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@apollo/client';
@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   XCircle,
   ShieldAlert,
+  TrendingUp,
 } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { SALE_DETAIL, REFUND_SALE, REQUEST_REFUND } from '@/lib/graphql/sales.queries';
@@ -162,8 +163,9 @@ export default function SaleDetailPage() {
   const subtotalGhs =
     sale != null ? Math.max(0, (sale.totalPesewas - sale.vatPesewas) / 100) : 0;
 
+
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -597,15 +599,8 @@ export default function SaleDetailPage() {
                       <td className="px-4 py-3">
                         <GhsMoney amount={lineTotal} className="font-mono font-semibold" />
                       </td>
-                      <td className="px-4 py-3">
-                        {line.supplierName ? (
-                          <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                            <Truck size={12} aria-hidden />
-                            {line.supplierName}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
+                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {line.supplierName ?? '—'}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {line.stockAfterSale}

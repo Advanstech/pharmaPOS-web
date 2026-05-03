@@ -2,7 +2,7 @@ import type { ApolloClient } from '@apollo/client';
 import { CREATE_SALE } from '@/lib/graphql/sales.mutations';
 import { DAILY_SUMMARY, RECENT_SALES } from '@/lib/graphql/sales.queries';
 import { buildCreateSaleInput } from '@/lib/sales/build-create-sale-input';
-import { getPendingSales, markSaleSynced } from '@/lib/db/offline.db';
+import { getPendingSales, markSaleSynced, deletePendingSale } from '@/lib/db/offline.db';
 import type { PaymentMethod } from '@/types';
 
 function tenderToApiMethod(m: PaymentMethod): 'CASH' | 'MTN_MOMO' {
@@ -50,9 +50,15 @@ export async function syncPendingSales(client: ApolloClient): Promise<number> {
         break;
       }
       
-      // If it's a GraphQL/Validation error, it might be a "poison pill" (e.g. product deleted)
-      // We should probably mark it as "failed" or just skip it for now.
-      // For now, we continue to the next one so one bad sale doesn't block the queue.
+      // If it's a GraphQL/Validation error (400), it's likely a "poison pill" 
+      // (e.g. product deleted, schema mismatch). Delete it to stop retrying.
+      const isBadRequest = e.networkError?.statusCode === 400 || 
+        (e.message && e.message.includes('400'));
+      if (isBadRequest) {
+        console.warn('[syncPendingSales] deleting bad sale', sale.id, '- will not retry');
+        await deletePendingSale(sale.id);
+      }
+      
       continue;
     }
   }

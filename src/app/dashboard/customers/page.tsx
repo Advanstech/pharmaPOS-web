@@ -288,17 +288,17 @@ export default function CustomersPage() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-surface-border bg-surface-card shadow-sm">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-sm min-w-[600px]">
           <thead className="border-b border-surface-border bg-surface-hover/60 text-xs uppercase tracking-wide text-content-muted">
             <tr>
-              <th className="px-4 py-3">Code</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Code</th>
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Sex</th>
-              <th className="px-4 py-3">Age</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Ghana Card</th>
-              <th className="px-4 py-3">Since</th>
+              <th className="px-4 py-3 hidden md:table-cell">Email</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Sex</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Age</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Phone</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Ghana Card</th>
+              <th className="px-4 py-3 hidden md:table-cell">Since</th>
               <th className="px-4 py-3 w-32">Actions</th>
             </tr>
           </thead>
@@ -320,16 +320,16 @@ export default function CustomersPage() {
             {!loading &&
               pagedRows.map((r) => (
                 <tr key={r.id} className="border-b border-surface-border last:border-0 hover:bg-surface-hover/40 transition-colors">
-                  <td className="px-4 py-3 font-mono font-semibold text-teal-700 dark:text-teal-400">
+                  <td className="px-4 py-3 font-mono font-semibold text-teal-700 dark:text-teal-400 hidden sm:table-cell">
                     {r.customerCode}
                   </td>
                   <td className="px-4 py-3 text-content-primary font-medium">{r.name?.trim() ? r.name : '—'}</td>
-                  <td className="px-4 py-3">{r.email || '—'}</td>
-                  <td className="px-4 py-3">{formatSex(r.sex)}</td>
-                  <td className="px-4 py-3">{r.ageYears != null ? r.ageYears : '—'}</td>
-                  <td className="px-4 py-3">{r.hasPhone ? 'On file' : '—'}</td>
-                  <td className="px-4 py-3">{r.hasGhanaCard ? 'On file' : '—'}</td>
-                  <td className="px-4 py-3 text-content-muted">{formatAccraDate(r.createdAt)}</td>
+                  <td className="px-4 py-3 hidden md:table-cell">{r.email || '—'}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell">{formatSex(r.sex)}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell">{r.ageYears != null ? r.ageYears : '—'}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell">{r.hasPhone ? 'On file' : '—'}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell">{r.hasGhanaCard ? 'On file' : '—'}</td>
+                  <td className="px-4 py-3 text-content-muted hidden md:table-cell">{formatAccraDate(r.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <a

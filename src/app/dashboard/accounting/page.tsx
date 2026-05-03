@@ -120,7 +120,7 @@ export default function AccountingPage() {
       {/* ── Hero Header ── */}
       <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.1) 0%, rgba(6,182,212,0.05) 50%, rgba(59,130,246,0.08) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
         <div className="mx-auto max-w-[1440px] px-4 pt-5 pb-4 md:px-6">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                 Financial Command Center
@@ -139,7 +139,7 @@ export default function AccountingPage() {
           </div>
 
           {/* Period + Tab selector */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
               {(['7d', '30d', '90d', '1y'] as Period[]).map(p => (
                 <button key={p} onClick={() => setPeriod(p)}
@@ -298,7 +298,7 @@ function OverviewTab({ pl, cf, openPayables, pendingExpenses, waterfallData, exp
       {/* ── Recent Activity (compact) ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Recent Expenses */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl overflow-x-auto" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
           <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid var(--surface-border)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Recent Expenses</h3>
             <Link href="/dashboard/expenses" className="text-[10px] font-bold text-teal hover:underline flex items-center gap-0.5">View All <ArrowRight size={10} /></Link>
@@ -321,7 +321,7 @@ function OverviewTab({ pl, cf, openPayables, pendingExpenses, waterfallData, exp
         </div>
 
         {/* Recent Invoices */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl overflow-x-auto" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
           <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid var(--surface-border)' }}>
             <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Supplier Invoices</h3>
             <Link href="/dashboard/accounting/invoices" className="text-[10px] font-bold text-teal hover:underline flex items-center gap-0.5">View All <ArrowRight size={10} /></Link>

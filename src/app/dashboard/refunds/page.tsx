@@ -76,7 +76,7 @@ export default function RefundsPage() {
             <ArrowLeft size={13} /> Dashboard
           </Link>
 
-          <div className="flex items-start justify-between gap-4 mb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl"
@@ -144,7 +144,7 @@ export default function RefundsPage() {
         </div>
 
         {/* List */}
-        <div className="rounded-2xl overflow-hidden"
+        <div className="rounded-2xl overflow-x-auto"
           style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
 
           {/* Table header */}

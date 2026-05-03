@@ -405,7 +405,7 @@ export default function SuppliersPage() {
 
         {/* ═══════════════════ DATA TABLE ═══════════════════ */}
         <div
-          className="overflow-hidden rounded-2xl"
+          className="overflow-x-auto rounded-2xl"
           style={{
             border: '1px solid var(--surface-border)',
             background: 'var(--surface-card)',

@@ -125,8 +125,8 @@ export default function ExpensesPage() {
       {/* Content */}
       <div className="mx-auto max-w-[1400px] px-4 py-5 md:px-6">
         {/* Filter bar */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1 rounded-xl p-1" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
             {[
               { key: '', label: 'All' },
               { key: 'PENDING', label: 'Pending (' + stats.pending + ')' },
@@ -145,7 +145,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+        <div className="overflow-x-auto rounded-2xl" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
           {/* Header */}
           <div className="hidden items-center gap-3 px-5 py-3 text-[10px] font-bold uppercase tracking-wider lg:grid"
             style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', gridTemplateColumns: '90px 1fr 100px 90px 110px 200px' }}>

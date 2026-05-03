@@ -9,12 +9,30 @@ const EOD_FIELDS = `
   expensesCount expensesPesewas expensesFormatted
   netRevenuePesewas netRevenueFormatted
   expectedCashPesewas expectedCashFormatted
+  expectedMomoPesewas expectedMomoFormatted
   cashCountedPesewas cashCountedFormatted
   momoCountedPesewas momoCountedFormatted
   totalCountedPesewas totalCountedFormatted
   variancePesewas varianceFormatted
-  isBalanced closingNotes closedAt
+  isBalanced closingNotes discrepancyReason closedAt
   approvalStatus approvedByName approvedAt managerNotes
+`;
+
+export const EOD_PREVIEW = gql`
+  query EodPreview($businessDate: String!) {
+    eodPreview(businessDate: $businessDate) {
+      salesCount
+      grossRevenuePesewas grossRevenueFormatted
+      vatCollectedPesewas vatCollectedFormatted
+      refundsCount refundsPesewas refundsFormatted
+      expensesCount expensesPesewas expensesFormatted
+      netRevenuePesewas netRevenueFormatted
+      expectedCashPesewas expectedCashFormatted
+      expectedMomoPesewas expectedMomoFormatted
+      sourceScope
+      isClosed
+    }
+  }
 `;
 
 export const CLOSE_REGISTER = gql`

@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Moon, CheckCircle2, AlertTriangle,
   Banknote, Smartphone, TrendingUp, ClipboardList,
   RefreshCw, History, ChevronDown, ChevronUp, ChevronRight,
-  CreditCard, ShieldCheck, ShieldX, Clock, Eye, Search, CalendarDays,
+  CreditCard, ShieldCheck, ShieldX, Clock, Eye, Search, LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import {
-  TODAY_EOD_STATUS, EOD_HISTORY, CLOSE_REGISTER,
+  TODAY_EOD_STATUS, EOD_HISTORY, CLOSE_REGISTER, EOD_PREVIEW,
   TODAY_PAYMENT_BREAKDOWN,
   APPROVE_EOD, DECLINE_EOD,
   BRANCH_EOD_FOR_DATE, STAFF_PENDING_EOD,
@@ -24,12 +25,16 @@ type EodRecord = {
   grossRevenueFormatted: string; vatCollectedFormatted: string;
   refundsCount: number; refundsFormatted: string;
   expensesCount: number; expensesFormatted: string;
-  netRevenueFormatted: string; expectedCashFormatted: string;
+  netRevenueFormatted: string;
+  expectedCashPesewas: number; expectedCashFormatted: string;
+  expectedMomoPesewas: number; expectedMomoFormatted: string;
   cashCountedPesewas: number; cashCountedFormatted: string;
   momoCountedPesewas: number; momoCountedFormatted: string;
   totalCountedFormatted: string;
   variancePesewas: number; varianceFormatted: string;
-  isBalanced: boolean; closingNotes: string | null; closedAt: string;
+  isBalanced: boolean; closingNotes: string | null;
+  discrepancyReason: string | null;
+  closedAt: string;
   approvalStatus: string; approvedByName: string | null;
   approvedAt: string | null; managerNotes: string | null;
 };
@@ -40,6 +45,19 @@ type PaymentBreakdown = {
 
 type StaffPendingItem = { id: string; name: string; role: string };
 
+type EodPreview = {
+  salesCount: number;
+  grossRevenueFormatted: string;
+  vatCollectedFormatted: string;
+  refundsCount: number; refundsFormatted: string;
+  expensesCount: number; expensesFormatted: string;
+  netRevenueFormatted: string;
+  expectedCashPesewas: number; expectedCashFormatted: string;
+  expectedMomoPesewas: number; expectedMomoFormatted: string;
+  sourceScope?: string;
+  isClosed: boolean;
+};
+
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('en-GH', { timeZone: 'Africa/Accra', dateStyle: 'medium', timeStyle: 'short' });
@@ -47,17 +65,20 @@ function fmtDate(iso: string) {
 function todayAccra(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
 }
-function shiftYmd(dateYmd: string, deltaDays: number): string {
-  const d = new Date(`${dateYmd}T00:00:00`);
-  d.setDate(d.getDate() + deltaDays);
-  return d.toISOString().slice(0, 10);
-}
 function methodLabel(m: string) {
   const map: Record<string, string> = {
     CASH: 'Cash', MTN_MOMO: 'MTN MoMo', VODAFONE_CASH: 'Vodafone Cash',
     AIRTELTIGO_MONEY: 'AirtelTigo', CARD: 'Card / POS', SPLIT: 'Split',
   };
   return map[m] ?? m;
+}
+function roleLabel(r: string) {
+  const map: Record<string, string> = {
+    owner: 'Owner', se_admin: 'Admin', manager: 'Manager',
+    head_pharmacist: 'Head Pharmacist', pharmacist: 'Pharmacist',
+    technician: 'Technician', cashier: 'Cashier', chemical_cashier: 'Chemical Cashier',
+  };
+  return map[r] ?? r;
 }
 function ApprovalBadge({ status }: { status: string }) {
   if (status === 'APPROVED')
@@ -67,7 +88,43 @@ function ApprovalBadge({ status }: { status: string }) {
   return <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(234,179,8,0.1)', color: '#d97706' }}><Clock size={10} />Pending Approval</span>;
 }
 
-/* ─── Manager Action Panel (approve / decline) ───────────────────────────── */
+/* ─── Logout Prompt Modal ────────────────────────────────────────────────── */
+function LogoutPrompt({ onLogout, onStay }: { onLogout: () => void; onStay: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 shadow-2xl" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(13,148,136,0.1)' }}>
+            <Moon size={18} style={{ color: '#0d9488' }} />
+          </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Shift Complete</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Register closed successfully</p>
+          </div>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          Would you like to sign out now that your shift is done?
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onStay}
+            className="flex-1 rounded-xl py-2.5 text-sm font-bold transition-all hover:opacity-80"
+            style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+            Stay Logged In
+          </button>
+          <button
+            onClick={onLogout}
+            className="flex-1 rounded-xl py-2.5 text-sm font-bold transition-all hover:opacity-90 flex items-center justify-center gap-2"
+            style={{ background: '#0d9488', color: '#fff' }}>
+            <LogOut size={14} /> Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Manager Action Panel ───────────────────────────────────────────────── */
 function ManagerActionPanel({ record, onDone }: { record: EodRecord; onDone: () => void }) {
   const [mgrNotes, setMgrNotes] = useState('');
   const [err, setErr] = useState('');
@@ -161,7 +218,8 @@ function EodSummaryCard({ record, showMgrActions }: { record: EodRecord; showMgr
               { label: 'VAT Collected', value: record.vatCollectedFormatted, sub: 'GRA obligation' },
               { label: 'Refunds', value: record.refundsFormatted, sub: `${record.refundsCount} item${record.refundsCount !== 1 ? 's' : ''}` },
               { label: 'Expenses', value: record.expensesFormatted, sub: `${record.expensesCount} item${record.expensesCount !== 1 ? 's' : ''}` },
-              { label: 'Expected Cash', value: record.expectedCashFormatted, sub: 'System computed' },
+              { label: 'Expected Cash', value: record.expectedCashFormatted, sub: 'System (cash sales)' },
+              { label: 'Expected MoMo', value: record.expectedMomoFormatted, sub: 'System (mobile money)' },
               { label: 'Cash Counted', value: record.cashCountedFormatted, sub: 'Physical count' },
               { label: 'MoMo Counted', value: record.momoCountedFormatted, sub: 'Mobile money' },
               { label: 'Variance', value: record.varianceFormatted, sub: balanced ? 'Within GH₵1.00 ✓' : 'Out of balance ⚠' },
@@ -177,6 +235,12 @@ function EodSummaryCard({ record, showMgrActions }: { record: EodRecord; showMgr
             <div className="rounded-xl p-3" style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)' }}>
               <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#a16207' }}>Cashier Notes</p>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{record.closingNotes}</p>
+            </div>
+          )}
+          {record.discrepancyReason && (
+            <div className="rounded-xl p-3" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: '#dc2626' }}>Discrepancy Explanation</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{record.discrepancyReason}</p>
             </div>
           )}
           {record.managerNotes && (
@@ -200,20 +264,12 @@ function EodSummaryCard({ record, showMgrActions }: { record: EodRecord; showMgr
 }
 
 /* ─── Manager Summary Card ───────────────────────────────────────────────── */
-function ManagerSummaryCard({
-  date,
-  onManage,
-}: {
-  date: string;
-  onManage: () => void;
-}) {
+function ManagerSummaryCard({ date, onManage }: { date: string; onManage: () => void }) {
   const { data } = useQuery<{ branchEodForDate: EodRecord[] }>(BRANCH_EOD_FOR_DATE, {
-    variables: { businessDate: date },
-    fetchPolicy: 'cache-and-network',
+    variables: { businessDate: date }, fetchPolicy: 'cache-and-network',
   });
   const { data: pending } = useQuery<{ staffPendingEod: StaffPendingItem[] }>(STAFF_PENDING_EOD, {
-    variables: { businessDate: date },
-    fetchPolicy: 'cache-and-network',
+    variables: { businessDate: date }, fetchPolicy: 'cache-and-network',
   });
 
   const submitted = data?.branchEodForDate ?? [];
@@ -221,15 +277,9 @@ function ManagerSummaryCard({
   const approvedCount = submitted.filter(r => r.approvalStatus === 'APPROVED').length;
 
   return (
-    <div
-      onClick={onManage}
+    <div onClick={onManage}
       className="group relative cursor-pointer rounded-2xl overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99]"
-      style={{
-        background: 'var(--surface-card)',
-        border: '1px solid var(--surface-border)',
-        boxShadow: '0 4px 20px rgba(99,102,241,0.08)',
-      }}
-    >
+      style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 20px rgba(99,102,241,0.08)' }}>
       <div className="flex items-center justify-between px-5 py-4" style={{ background: 'rgba(99,102,241,0.04)', borderBottom: '1px solid var(--surface-border)' }}>
         <div className="flex items-center gap-2 text-[#6366f1]">
           <ClipboardList size={16} />
@@ -258,80 +308,311 @@ function ManagerSummaryCard({
   );
 }
 
-/* ─── Team Workbench View ────────────────────────────────────────────────── */
-function TeamWorkbench({
-  selectedDate,
-  onDateChange,
-  onBack,
-}: {
-  selectedDate: string;
-  onDateChange: (date: string) => void;
-  onBack: () => void;
-}) {
-  const [search, setSearch] = useState('');
-  const { data: branchData, loading: branchLoading, refetch } = useQuery<{
-    branchEodForDate: EodRecord[];
-  }>(BRANCH_EOD_FOR_DATE, {
-    variables: { businessDate: selectedDate },
-    fetchPolicy: 'cache-and-network',
+/* ─── Close Register Form ────────────────────────────────────────────────── */
+function CloseRegisterForm({ onSuccess }: { onSuccess: (r: EodRecord) => void }) {
+  const today = todayAccra();
+  const [cash, setCash] = useState('');
+  const [momo, setMomo] = useState('');
+  const [notes, setNotes] = useState('');
+  const [discrepancy, setDiscrepancy] = useState('');
+  const [err, setErr] = useState('');
+
+  const cashPesewas = Math.round((parseFloat(cash) || 0) * 100);
+  const momoPesewas = Math.round((parseFloat(momo) || 0) * 100);
+
+  const { data: previewData, loading: previewLoading } = useQuery<{ eodPreview: EodPreview }>(EOD_PREVIEW, {
+    variables: { businessDate: today },
+    fetchPolicy: 'network-only',
+  });
+  const preview = previewData?.eodPreview;
+
+  const [closeRegister, { loading }] = useMutation(CLOSE_REGISTER, {
+    onCompleted: (d) => onSuccess(d.closeRegister),
+    onError: (e) => setErr(e.message),
+    refetchQueries: ['TodayEodStatus', 'EodHistory', 'PendingEodApprovals'],
   });
 
-  const { data: pendingStaffData, loading: pendingStaffLoading } = useQuery<{
-    staffPendingEod: StaffPendingItem[];
-  }>(STAFF_PENDING_EOD, {
-    variables: { businessDate: selectedDate },
-    fetchPolicy: 'cache-and-network',
-  });
+  function submit() {
+    setErr('');
+    if (!cash && !momo) { setErr('Please enter at least a cash or MoMo amount.'); return; }
+    closeRegister({
+      variables: {
+        input: {
+          businessDate: today,
+          cashCountedPesewas: cashPesewas,
+          momoCountedPesewas: momoPesewas,
+          closingNotes: notes.trim() || null,
+          discrepancyReason: discrepancy.trim() || null,
+        },
+      },
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* System Preview Panel */}
+      <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(13,148,136,0.04)', border: '1px solid rgba(13,148,136,0.15)' }}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#0d9488' }}>System Summary for {today}</p>
+          <div className="flex items-center gap-2">
+            {preview?.sourceScope === 'BRANCH_FALLBACK' && (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                style={{ background: 'rgba(217,119,6,0.12)', color: '#b45309', border: '1px solid rgba(217,119,6,0.2)' }}>
+                Branch totals fallback
+              </span>
+            )}
+            {previewLoading && <RefreshCw size={12} className="animate-spin opacity-40" />}
+          </div>
+        </div>
+        {preview ? (
+          <>
+            {/* Top stats row */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: 'Total Sales', value: preview.grossRevenueFormatted, sub: `${preview.salesCount} txn${preview.salesCount !== 1 ? 's' : ''}` },
+                { label: 'Net Revenue', value: preview.netRevenueFormatted, sub: 'After refunds & expenses' },
+                { label: 'VAT Collected', value: preview.vatCollectedFormatted, sub: 'NHIL/VAT' },
+                { label: 'Refunds', value: preview.refundsFormatted, sub: `${preview.refundsCount} item${preview.refundsCount !== 1 ? 's' : ''}` },
+              ].map(({ label, value, sub }) => (
+                <div key={label} className="rounded-lg p-2.5" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+                  <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                  <p className="mt-0.5 font-mono text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Expected amounts — prominent confirm cards */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* Cash */}
+              <div className="rounded-xl p-3.5 space-y-2" style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.25)' }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Banknote size={14} style={{ color: '#16a34a' }} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#16a34a' }}>Expected Cash</span>
+                  </div>
+                  <span className="font-mono text-base font-bold" style={{ color: '#15803d' }}>{preview.expectedCashFormatted}</span>
+                </div>
+                <p className="text-[10px]" style={{ color: '#4ade80' }}>From cash sales recorded today</p>
+                <button
+                  type="button"
+                  onClick={() => setCash((preview.expectedCashPesewas / 100).toFixed(2))}
+                  className="w-full rounded-lg py-1.5 text-xs font-bold transition-all hover:opacity-80"
+                  style={{ background: 'rgba(22,163,74,0.15)', color: '#15803d', border: '1px solid rgba(22,163,74,0.3)' }}>
+                  ✓ Confirm — use this amount
+                </button>
+              </div>
+              {/* MoMo */}
+              <div className="rounded-xl p-3.5 space-y-2" style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)' }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Smartphone size={14} style={{ color: '#2563eb' }} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#2563eb' }}>Expected MoMo</span>
+                  </div>
+                  <span className="font-mono text-base font-bold" style={{ color: '#1d4ed8' }}>{preview.expectedMomoFormatted}</span>
+                </div>
+                <p className="text-[10px]" style={{ color: '#93c5fd' }}>From mobile money sales today</p>
+                <button
+                  type="button"
+                  onClick={() => setMomo((preview.expectedMomoPesewas / 100).toFixed(2))}
+                  className="w-full rounded-lg py-1.5 text-xs font-bold transition-all hover:opacity-80"
+                  style={{ background: 'rgba(37,99,235,0.12)', color: '#1d4ed8', border: '1px solid rgba(37,99,235,0.25)' }}>
+                  ✓ Confirm — use this amount
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              Confirm the amounts above if they match your physical count, or enter different values below to report a discrepancy.
+            </p>
+          </>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading today&apos;s sales…</p>
+        )}
+      </div>
+
+      <div className="rounded-xl p-1" style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+        <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Physical Count — enter what you actually counted</p>
+        <div className="grid gap-3 p-3 sm:grid-cols-2">
+          {/* Cash */}
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              <Banknote size={13} /> Cash in Drawer (GH₵)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: 'var(--text-muted)' }}>GH₵</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={cash} onChange={e => setCash(e.target.value)}
+                className="w-full rounded-xl border py-3 pl-10 pr-4 text-sm font-bold outline-none focus:ring-2 font-mono"
+                style={{ background: 'var(--surface-card)', borderColor: cashPesewas > 0 && preview ? (cashPesewas === preview.expectedCashPesewas ? '#16a34a' : cashPesewas < preview.expectedCashPesewas ? '#dc2626' : '#d97706') : 'var(--surface-border)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            {preview && cashPesewas > 0 && (() => {
+              const diff = cashPesewas - preview.expectedCashPesewas;
+              const color = diff === 0 ? '#16a34a' : diff < 0 ? '#dc2626' : '#d97706';
+              const label = diff === 0 ? '✓ Matches system' : diff < 0 ? `Short by GH₵${Math.abs(diff / 100).toFixed(2)}` : `Excess GH₵${(diff / 100).toFixed(2)}`;
+              return <p className="mt-1 text-[10px] font-bold" style={{ color }}>{label}</p>;
+            })()}
+          </div>
+          {/* MoMo */}
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              <Smartphone size={13} /> MoMo Received (GH₵)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: 'var(--text-muted)' }}>GH₵</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={momo} onChange={e => setMomo(e.target.value)}
+                className="w-full rounded-xl border py-3 pl-10 pr-4 text-sm font-bold outline-none focus:ring-2 font-mono"
+                style={{ background: 'var(--surface-card)', borderColor: momoPesewas > 0 && preview ? (momoPesewas === preview.expectedMomoPesewas ? '#16a34a' : momoPesewas < preview.expectedMomoPesewas ? '#dc2626' : '#d97706') : 'var(--surface-border)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            {preview && momoPesewas > 0 && (() => {
+              const diff = momoPesewas - preview.expectedMomoPesewas;
+              const color = diff === 0 ? '#16a34a' : diff < 0 ? '#dc2626' : '#d97706';
+              const label = diff === 0 ? '✓ Matches system' : diff < 0 ? `Short by GH₵${Math.abs(diff / 100).toFixed(2)}` : `Excess GH₵${(diff / 100).toFixed(2)}`;
+              return <p className="mt-1 text-[10px] font-bold" style={{ color }}>{label}</p>;
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* Closing Notes */}
+      <div>
+        <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Closing Notes <span className="font-normal normal-case">(optional)</span>
+        </label>
+        <textarea
+          rows={2} placeholder="Any handover notes for the next shift…"
+          value={notes} onChange={e => setNotes(e.target.value)}
+          className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none resize-none"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+      </div>
+
+      {/* Discrepancy */}
+      <div>
+        <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Discrepancy Reason <span className="font-normal normal-case">(required if cash is short)</span>
+        </label>
+        <textarea
+          rows={2} placeholder="Explain any cash shortage…"
+          value={discrepancy} onChange={e => setDiscrepancy(e.target.value)}
+          className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none resize-none"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+      </div>
+
+      {err && (
+        <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', color: '#dc2626' }}>
+          {err}
+        </div>
+      )}
+
+      {/* Total preview */}
+      {(cashPesewas > 0 || momoPesewas > 0) && (
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Cash', val: `GH₵${(cashPesewas / 100).toFixed(2)}`, color: '#16a34a' },
+            { label: 'MoMo', val: `GH₵${(momoPesewas / 100).toFixed(2)}`, color: '#2563eb' },
+            { label: 'Total', val: `GH₵${((cashPesewas + momoPesewas) / 100).toFixed(2)}`, color: '#0d9488' },
+          ].map(({ label, val, color }) => (
+            <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</p>
+              <p className="mt-0.5 font-mono text-sm font-bold" style={{ color }}>{val}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={submit} disabled={loading}
+        className="w-full rounded-2xl py-3.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+        style={{ background: '#0d9488', color: '#fff' }}
+      >
+        {loading
+          ? <><RefreshCw size={16} className="animate-spin" />Closing Register…</>
+          : <><Moon size={16} />Close Register for {today}</>}
+      </button>
+    </div>
+  );
+}
+
+/* ─── Payment Breakdown Widget ───────────────────────────────────────────── */
+function PaymentBreakdownWidget() {
+  const today = todayAccra();
+  const periodStart = `${today}T00:00:00`;
+  const periodEnd = `${today}T23:59:59`;
+  const { data, loading } = useQuery<{ paymentMethodBreakdown: PaymentBreakdown[] }>(
+    TODAY_PAYMENT_BREAKDOWN, { variables: { periodStart, periodEnd }, fetchPolicy: 'cache-and-network' },
+  );
+  const rows = data?.paymentMethodBreakdown ?? [];
+  if (loading && rows.length === 0) return (
+    <div className="flex items-center justify-center py-6 opacity-40">
+      <RefreshCw size={16} className="animate-spin mr-2" /><span className="text-sm">Loading…</span>
+    </div>
+  );
+  if (rows.length === 0) return (
+    <p className="py-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No payment data yet today.</p>
+  );
+  return (
+    <div className="space-y-2">
+      {rows.map(r => (
+        <div key={r.method} className="flex items-center justify-between rounded-xl px-3 py-2.5"
+          style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)' }}>
+          <div className="flex items-center gap-2">
+            <CreditCard size={14} style={{ color: 'var(--text-muted)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{methodLabel(r.method)}</span>
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: 'var(--surface-hover)', color: 'var(--text-muted)' }}>{r.count}</span>
+          </div>
+          <span className="font-mono text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{r.totalFormatted}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Team Workbench ─────────────────────────────────────────────────────── */
+function TeamWorkbench({ selectedDate, onDateChange, onBack }: {
+  selectedDate: string; onDateChange: (d: string) => void; onBack: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const { data: branchData, loading: branchLoading, refetch } = useQuery<{ branchEodForDate: EodRecord[] }>(
+    BRANCH_EOD_FOR_DATE, { variables: { businessDate: selectedDate }, fetchPolicy: 'cache-and-network' },
+  );
+  const { data: pendingStaffData } = useQuery<{ staffPendingEod: StaffPendingItem[] }>(
+    STAFF_PENDING_EOD, { variables: { businessDate: selectedDate }, fetchPolicy: 'cache-and-network' },
+  );
 
   const submitted = branchData?.branchEodForDate ?? [];
   const notSubmitted = pendingStaffData?.staffPendingEod ?? [];
   const q = search.trim().toLowerCase();
-
-  const filteredSubmitted = q
-    ? submitted.filter(r => r.cashierName.toLowerCase().includes(q))
-    : submitted;
-  const filteredNotSubmitted = q
-    ? notSubmitted.filter(s => s.name.toLowerCase().includes(q))
-    : notSubmitted;
+  const filteredSubmitted = q ? submitted.filter(r => r.cashierName.toLowerCase().includes(q)) : submitted;
+  const filteredNotSubmitted = q ? notSubmitted.filter(s => s.name.toLowerCase().includes(q)) : notSubmitted;
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Workbench Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          onClick={onBack}
-          className="flex w-fit items-center gap-1.5 text-xs font-bold text-teal hover:underline"
-        >
+        <button onClick={onBack} className="flex w-fit items-center gap-1.5 text-xs font-bold text-teal hover:underline">
           <ArrowLeft size={13} /> Back to My Closing
         </button>
-
         <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => onDateChange(e.target.value)}
-            className="rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold outline-none"
-          />
-          <button
-            onClick={() => refetch()}
-            className="rounded-xl border border-surface-border bg-surface-card p-2 text-text-muted transition-colors hover:text-teal"
-          >
+          <input type="date" value={selectedDate} onChange={e => onDateChange(e.target.value)}
+            className="rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold outline-none" />
+          <button onClick={() => refetch()}
+            className="rounded-xl border border-surface-border bg-surface-card p-2 text-text-muted transition-colors hover:text-teal">
             <RefreshCw size={16} className={branchLoading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
-      {/* Stats and Search */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="md:col-span-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30" size={16} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search staff by name..."
-              className="w-full rounded-2xl border border-surface-border bg-surface-card py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-teal/50"
-            />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search staff by name..."
+              className="w-full rounded-2xl border border-surface-border bg-surface-card py-3 pl-10 pr-4 text-sm font-medium outline-none focus:border-teal/50" />
           </div>
         </div>
         <div className="flex items-center justify-center gap-3 rounded-2xl bg-teal/5 border border-teal/10 px-4 py-2">
@@ -347,9 +628,7 @@ function TeamWorkbench({
         </div>
       </div>
 
-      {/* Lists */}
       <div className="space-y-8">
-        {/* Submitted Section */}
         <section>
           <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
             Submitted Records ({filteredSubmitted.length})
@@ -361,18 +640,15 @@ function TeamWorkbench({
             </div>
           ) : filteredSubmitted.length > 0 ? (
             <div className="space-y-3">
-              {filteredSubmitted.map(r => (
-                <EodSummaryCard key={r.id} record={r} showMgrActions={true} />
-              ))}
+              {filteredSubmitted.map(r => <EodSummaryCard key={r.id} record={r} showMgrActions={true} />)}
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-surface-border py-12 text-center text-sm text-text-muted">
-              No submitted records found for this criteria.
+              No submitted records found.
             </div>
           )}
         </section>
 
-        {/* Not Submitted Section */}
         {filteredNotSubmitted.length > 0 && (
           <section>
             <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600/80">
@@ -380,10 +656,7 @@ function TeamWorkbench({
             </h2>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {filteredNotSubmitted.map(s => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-3 rounded-xl border border-amber-600/10 bg-amber-600/[0.02] p-3"
-                >
+                <div key={s.id} className="flex items-center gap-3 rounded-xl border border-amber-600/10 bg-amber-600/[0.02] p-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-600/10 text-xs font-bold text-amber-600">
                     {s.name.charAt(0).toUpperCase()}
                   </div>
@@ -401,466 +674,190 @@ function TeamWorkbench({
   );
 }
 
-/* ─── Role label ─────────────────────────────────────────────────────────── */
-function roleLabel(r: string) {
-  const map: Record<string, string> = {
-    owner: 'Owner', se_admin: 'Admin', manager: 'Manager',
-    head_pharmacist: 'Head Pharmacist', pharmacist: 'Pharmacist',
-    technician: 'Technician', cashier: 'Cashier', chemical_cashier: 'Chemical Cashier',
-  };
-  return map[r] ?? r;
-}
+/* ─── Main Page ──────────────────────────────────────────────────────────── */
+const MANAGER_ROLES = ['owner', 'se_admin', 'manager', 'head_pharmacist'];
 
 export default function EodClient() {
+  const { user, clearAuth } = useAuthStore();
+  const router = useRouter();
   const today = todayAccra();
-  const [managerDate, setManagerDate] = useState(today);
-  const [viewMode, setViewMode] = useState<'my' | 'team'>('my');
-  const user = useAuthStore(s => s.user);
-  const isManager = ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(user?.role ?? '');
+  const isManager = !!user && MANAGER_ROLES.includes(user.role);
 
-  /* ── Queries ── */
+  const [view, setView] = useState<'main' | 'team'>('main');
+  const [teamDate, setTeamDate] = useState(today);
+  const [justClosed, setJustClosed] = useState<EodRecord | null>(null);
+  const [showLogout, setShowLogout] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
   const { data: statusData, loading: statusLoading, refetch: refetchStatus } = useQuery<{
     todayEodStatus: { isClosed: boolean; record: EodRecord | null };
-  }>(TODAY_EOD_STATUS, { fetchPolicy: 'cache-and-network' });
+  }>(TODAY_EOD_STATUS, { fetchPolicy: 'network-only' });
 
-  const { data: historyData, loading: historyLoading } = useQuery<{
-    eodHistory: EodRecord[];
-  }>(EOD_HISTORY, { variables: { limit: 14 }, fetchPolicy: 'cache-and-network' });
-
-  const { data: breakdownData, loading: breakdownLoading } = useQuery<{
-    paymentMethodBreakdown: PaymentBreakdown[];
-  }>(TODAY_PAYMENT_BREAKDOWN, {
-    variables: { periodStart: today, periodEnd: today },
-    fetchPolicy: 'cache-and-network',
-  });
-
-  /* ── Mutation ── */
-  const [closeRegister, { loading: closing }] = useMutation(CLOSE_REGISTER, {
-    onCompleted: () => { refetchStatus(); setStep('done'); },
-    onError: (e) => setError(e.message),
-    refetchQueries: ['EodHistory'],
-  });
-
-  /* ── Local state ── */
-  const [step, setStep] = useState<'enter' | 'confirm' | 'done'>('enter');
-  const [cashCounted, setCashCounted] = useState('');
-  const [momoCounted, setMomoCounted] = useState('');
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
+  const { data: historyData, loading: historyLoading } = useQuery<{ eodHistory: EodRecord[] }>(
+    EOD_HISTORY, { variables: { limit: 20 }, skip: !showHistory, fetchPolicy: 'cache-and-network' },
+  );
 
   const isClosed = statusData?.todayEodStatus?.isClosed ?? false;
   const todayRecord = statusData?.todayEodStatus?.record ?? null;
   const history = historyData?.eodHistory ?? [];
-  const breakdown = breakdownData?.paymentMethodBreakdown ?? [];
 
-  /* ── Derived totals ── */
-  const cashSystemPesewas = breakdown.find(b => b.method === 'CASH')?.totalPesewas ?? 0;
-  const momoSystemPesewas = breakdown
-    .filter(b => ['MTN_MOMO', 'VODAFONE_CASH', 'AIRTELTIGO_MONEY'].includes(b.method))
-    .reduce((s, b) => s + b.totalPesewas, 0);
-
-  const totalSystemPesewas = breakdown.reduce((s, b) => s + b.totalPesewas, 0);
-
-  const cashVal = parseFloat(cashCounted || '0') || 0;
-  const momoVal = parseFloat(momoCounted || '0') || 0;
-  const totalCounted = cashVal + momoVal;
-
-  /* Pre-fill from system when entering step */
-  function prefillFromSystem() {
-    if (!cashCounted) setCashCounted((cashSystemPesewas / 100).toFixed(2));
-    if (!momoCounted) setMomoCounted((momoSystemPesewas / 100).toFixed(2));
+  function handleClosed(record: EodRecord) {
+    setJustClosed(record);
+    refetchStatus();
+    setShowLogout(true);
   }
 
-  function goToConfirm() {
-    setError('');
-    if (cashVal < 0 || momoVal < 0) { setError('Amounts cannot be negative.'); return; }
-    setStep('confirm');
+  if (view === 'team') {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
+        <TeamWorkbench selectedDate={teamDate} onDateChange={setTeamDate} onBack={() => setView('main')} />
+      </div>
+    );
   }
 
-  async function handleSubmit() {
-    setError('');
-    try {
-      await closeRegister({
-        variables: {
-          input: {
-            businessDate: today,
-            cashCountedPesewas: Math.round(cashVal * 100),
-            momoCountedPesewas: Math.round(momoVal * 100),
-            closingNotes: notes.trim() || null,
-          },
-        },
-      });
-    } catch { /* handled in onError */ }
-  }
-
-  /* ── Render ── */
   return (
-    <div style={{ background: 'var(--surface-base)', minHeight: '100vh' }}>
+    <div className="p-4 md:p-8 max-w-3xl mx-auto pb-20" style={{ minHeight: '100%' }}>
+      {showLogout && (
+        <LogoutPrompt
+          onLogout={() => { clearAuth(); router.push('/login'); }}
+          onStay={() => setShowLogout(false)}
+        />
+      )}
 
-      {/* ── Hero ─────────────────────────────────────── */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(13,148,136,0.07) 0%, rgba(99,102,241,0.05) 100%)',
-        borderBottom: '1px solid var(--surface-border)',
-      }}>
-        <div className="mx-auto max-w-[960px] px-4 pb-6 pt-6 md:px-6">
-          <Link href="/dashboard" className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline">
-            <ArrowLeft size={13} /> Dashboard
-          </Link>
-          <div className="flex items-start justify-between gap-4 mb-5">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(13,148,136,0.1)' }}>
-                  <Moon size={18} style={{ color: '#0d9488' }} />
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Register & Reconciliation</h1>
-              </div>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Close the daily register and reconcile cash for <strong>{today}</strong>
-              </p>
-            </div>
+      {/* Header */}
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl"
+            style={{ background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.2)' }}>
+            <Moon size={22} style={{ color: '#0d9488' }} />
           </div>
-          <div className="flex items-center gap-2 rounded-2xl px-4 py-3"
-            style={{
-              background: isClosed ? 'rgba(22,163,74,0.08)' : 'rgba(234,179,8,0.08)',
-              border: `1px solid ${isClosed ? 'rgba(22,163,74,0.25)' : 'rgba(234,179,8,0.25)'}`,
-            }}>
-            {isClosed ? <CheckCircle2 size={16} style={{ color: '#16a34a' }} /> : <AlertTriangle size={16} style={{ color: '#d97706' }} />}
-            <span className="text-sm font-semibold" style={{ color: isClosed ? '#16a34a' : '#d97706' }}>
-              {isClosed ? 'Register closed for today' : 'Register is open — not yet closed for today'}
-            </span>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>End of Day</h1>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {today} · {user?.name ?? 'Staff'} · {user?.branchName ?? ''}
+            </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isManager && (
+            <button
+              onClick={() => setView('team')}
+              className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all hover:opacity-80"
+              style={{ background: 'rgba(99,102,241,0.06)', color: '#6366f1', borderColor: 'rgba(99,102,241,0.2)' }}>
+              <ClipboardList size={13} /> Team Records
+            </button>
+          )}
+          <button
+            onClick={() => setShowHistory(h => !h)}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all hover:opacity-80"
+            style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', borderColor: 'var(--surface-border)' }}>
+            <History size={13} /> History
+          </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[960px] px-4 py-6 md:px-6 space-y-8">
-
-        {statusLoading && !statusData && (
-          <div className="py-10 flex justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-          </div>
-        )}
-
-        {/* ── MANAGER VIEW ── */}
-        {isManager && viewMode === 'team' && (
-          <TeamWorkbench
-            selectedDate={managerDate}
-            onDateChange={setManagerDate}
-            onBack={() => setViewMode('my')}
-          />
-        )}
-
-        {/* ── PERSONAL VIEW ── */}
-        {(!isManager || viewMode === 'my') && (
-          <div className="space-y-8">
-            {/* Manager Entry Point */}
-            {isManager && (
-              <ManagerSummaryCard
-                date={today}
-                onManage={() => setViewMode('team')}
-              />
-            )}
-
-            {/* Today's closed record */}
-            {todayRecord && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-teal" />
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-text-muted">
-                    Your Closing Report
-                  </h2>
-                </div>
-                <EodSummaryCard record={todayRecord} showMgrActions={isManager} />
-              </div>
-            )}
-
-            {/* Close Register Form */}
-            {!isClosed && !statusLoading && step !== 'done' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Moon size={14} className="text-text-muted" />
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-text-muted">
-                    Complete Your Shift
-                  </h2>
-                </div>
-                <div className="rounded-2xl overflow-hidden"
-                  style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
-
-                  {/* Header */}
-                  <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ClipboardList size={16} style={{ color: '#0d9488' }} />
-                        <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                          Close Register — {today}
-                        </h2>
-                      </div>
-                      {/* Step pills */}
-                      <div className="flex items-center gap-1.5">
-                        {[
-                          { id: 'enter', label: '1 Count' },
-                          { id: 'confirm', label: '2 Review' },
-                        ].map(s => (
-                          <span key={s.id} className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
-                            style={{
-                              background: step === s.id ? 'rgba(13,148,136,0.15)' : 'var(--surface-base)',
-                              color: step === s.id ? '#0d9488' : 'var(--text-muted)',
-                              border: `1px solid ${step === s.id ? 'rgba(13,148,136,0.3)' : 'var(--surface-border)'}`,
-                            }}>
-                            {s.label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── STEP 1: Enter counts ── */}
-                  {step === 'enter' && (
-                    <div className="p-5 space-y-5">
-
-                      {/* Today's system sales breakdown */}
-                      {breakdown.length > 0 && (
-                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
-                          <div className="px-4 py-2.5 flex items-center justify-between"
-                            style={{ background: 'rgba(13,148,136,0.05)', borderBottom: '1px solid var(--surface-border)' }}>
-                            <div className="flex items-center gap-1.5">
-                              <TrendingUp size={13} style={{ color: '#0d9488' }} />
-                              <span className="text-xs font-bold" style={{ color: '#0d9488' }}>Today's Sales by Payment Method</span>
-                            </div>
-                            <button
-                              onClick={prefillFromSystem}
-                              className="text-[10px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                              style={{ background: 'rgba(13,148,136,0.12)', color: '#0d9488' }}>
-                              Auto-fill
-                            </button>
-                          </div>
-                          <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
-                            {breakdown.map(b => (
-                              <div key={b.method} className="flex items-center justify-between px-4 py-2.5">
-                                <div className="flex items-center gap-2">
-                                  <span style={{ color: 'var(--text-muted)' }}>
-                                    {b.method === 'CASH' ? <Banknote size={13} /> : b.method === 'CARD' ? <CreditCard size={13} /> : <Smartphone size={13} />}
-                                  </span>
-                                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{methodLabel(b.method)}</span>
-                                  <span className="text-[10px] rounded-full px-1.5 py-0.5 font-bold"
-                                    style={{ background: 'var(--surface-base)', color: 'var(--text-muted)' }}>
-                                    {b.count} txn{b.count !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                                <span className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{b.totalFormatted}</span>
-                              </div>
-                            ))}
-                            <div className="flex items-center justify-between px-4 py-2.5"
-                              style={{ background: 'rgba(13,148,136,0.04)' }}>
-                              <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Total System Sales</span>
-                              <span className="text-sm font-bold font-mono" style={{ color: '#0d9488' }}>
-                                GH₵{(totalSystemPesewas / 100).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {breakdownLoading && breakdown.length === 0 && (
-                        <div className="flex items-center gap-2 py-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading today's sales…</span>
-                        </div>
-                      )}
-
-                      {/* Physical count inputs */}
-                      <div>
-                        <p className="text-xs font-bold mb-3" style={{ color: 'var(--text-secondary)' }}>Physical Count</p>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          {[
-                            { label: 'Cash in Drawer (GH₵)', icon: Banknote, value: cashCounted, set: setCashCounted, hint: cashSystemPesewas > 0 ? `System: GH₵${(cashSystemPesewas / 100).toFixed(2)}` : undefined },
-                            { label: 'MoMo Received (GH₵)', icon: Smartphone, value: momoCounted, set: setMomoCounted, hint: momoSystemPesewas > 0 ? `System: GH₵${(momoSystemPesewas / 100).toFixed(2)}` : undefined },
-                          ].map(({ label, icon: Icon, value, set, hint }) => (
-                            <div key={label}>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>
-                                  <Icon size={11} className="inline mr-1" />{label}
-                                </label>
-                                {hint && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
-                              </div>
-                              <input
-                                type="number" min="0" step="0.01" placeholder="0.00"
-                                value={value} onChange={e => set(e.target.value)}
-                                className="w-full rounded-xl px-4 py-2.5 text-sm font-mono font-semibold outline-none transition-all"
-                                style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Live total + variance preview */}
-                      {(cashCounted || momoCounted) && (
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                          {[
-                            { label: 'Cash Counted', value: `GH₵${cashVal.toFixed(2)}`, color: '#0d9488' },
-                            { label: 'MoMo Counted', value: `GH₵${momoVal.toFixed(2)}`, color: '#6366f1' },
-                            { label: 'Total Counted', value: `GH₵${totalCounted.toFixed(2)}`, color: totalCounted * 100 >= totalSystemPesewas - 100 ? '#16a34a' : '#dc2626' },
-                          ].map(({ label, value, color }) => (
-                            <div key={label} className="rounded-xl px-3 py-2.5 text-center"
-                              style={{ background: color + '08', border: `1px solid ${color}25` }}>
-                              <p className="text-[10px] font-bold uppercase" style={{ color }}>{label}</p>
-                              <p className="text-base font-bold font-mono mt-0.5" style={{ color }}>{value}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                          Closing Notes (optional)
-                        </label>
-                        <textarea
-                          rows={2} placeholder="Any notes about discrepancies, incidents, etc."
-                          value={notes} onChange={e => setNotes(e.target.value)}
-                          className="w-full rounded-xl px-4 py-2.5 text-sm outline-none resize-none"
-                          style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}
-                        />
-                      </div>
-
-                      {error && (
-                        <div className="flex items-center gap-2 rounded-xl px-4 py-3"
-                          style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                          <AlertTriangle size={14} style={{ color: '#dc2626' }} />
-                          <span className="text-sm" style={{ color: '#dc2626' }}>{error}</span>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={goToConfirm}
-                        disabled={!cashCounted && !momoCounted}
-                        className="w-full rounded-xl py-3 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        style={{ background: '#0d9488', color: '#fff' }}>
-                        <Eye size={14} /> Review Before Submitting
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ── STEP 2: Confirm ── */}
-                  {step === 'confirm' && (
-                    <div className="p-5 space-y-5">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                        Confirm your counts before sending to manager for approval.
-                      </p>
-
-                      {/* Confirmation grid */}
-                      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
-                        {[
-                          { label: 'Business Date', value: today, icon: <ClipboardList size={13} /> },
-                          { label: 'Cash in Drawer', value: `GH₵${cashVal.toFixed(2)}`, icon: <Banknote size={13} />, sys: cashSystemPesewas > 0 ? `GH₵${(cashSystemPesewas / 100).toFixed(2)} system` : undefined },
-                          { label: 'MoMo Received', value: `GH₵${momoVal.toFixed(2)}`, icon: <Smartphone size={13} />, sys: momoSystemPesewas > 0 ? `GH₵${(momoSystemPesewas / 100).toFixed(2)} system` : undefined },
-                          { label: 'Total Counted', value: `GH₵${totalCounted.toFixed(2)}`, icon: <TrendingUp size={13} /> },
-                        ].map(({ label, value, icon, sys }: any) => (
-                          <div key={label} className="flex items-center justify-between px-4 py-3"
-                            style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                            <div className="flex items-center gap-2">
-                              <span style={{ color: 'var(--text-muted)' }}>{icon}</span>
-                              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-                              {sys && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>({sys})</span>}
-                            </div>
-                            <span className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{value}</span>
-                          </div>
-                        ))}
-                        {notes.trim() && (
-                          <div className="px-4 py-3">
-                            <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Notes: </span>
-                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{notes}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-xl px-4 py-3 flex items-start gap-2"
-                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                        <Clock size={14} className="mt-0.5 shrink-0" style={{ color: '#6366f1' }} />
-                        <p className="text-xs" style={{ color: '#6366f1' }}>
-                          After submission, this will be sent to a manager for review. They will <strong>approve</strong> or <strong>decline</strong> the closing.
-                        </p>
-                      </div>
-
-                      {error && (
-                        <div className="flex items-center gap-2 rounded-xl px-4 py-3"
-                          style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                          <AlertTriangle size={14} style={{ color: '#dc2626' }} />
-                          <span className="text-sm" style={{ color: '#dc2626' }}>{error}</span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setStep('enter')}
-                          className="flex-1 rounded-xl py-3 text-sm font-bold transition-all hover:opacity-80"
-                          style={{ background: 'var(--surface-base)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
-                          ← Edit Counts
-                        </button>
-                        <button
-                          onClick={handleSubmit}
-                          disabled={closing}
-                          className="flex-[2] rounded-xl py-3 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-                          style={{ background: '#0d9488', color: '#fff' }}>
-                          {closing
-                            ? <><RefreshCw size={14} className="animate-spin" /> Submitting…</>
-                            : <><Moon size={14} /> Submit for Approval</>}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Done state */}
-            {(isClosed || step === 'done') && todayRecord === null && (
-              <div className="rounded-2xl px-6 py-10 text-center"
-                style={{ background: 'var(--surface-card)', border: '1px solid rgba(22,163,74,0.2)' }}>
-                <CheckCircle2 className="mx-auto mb-3 h-10 w-10" style={{ color: '#16a34a' }} />
-                <p className="text-base font-bold" style={{ color: '#16a34a' }}>Register closed & submitted!</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Awaiting manager approval. You'll see the result in the history below.
-                </p>
-              </div>
-            )}
-
-            {/* Recent History */}
+      {/* Today's status banner */}
+      {statusLoading ? (
+        <div className="mb-6 flex items-center gap-2 rounded-2xl border p-4" style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)' }}>
+          <RefreshCw size={16} className="animate-spin opacity-40" />
+          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Checking today's status…</span>
+        </div>
+      ) : isClosed ? (
+        <div className="mb-6">
+          <div className="mb-2 flex items-center gap-2 rounded-2xl p-4"
+            style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)' }}>
+            <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <History size={14} className="text-text-muted" />
-                <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Recent Closing History
-                </h2>
-              </div>
-
-              {historyLoading && history.length === 0 && (
-                <div className="py-8 flex justify-center">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-                </div>
-              )}
-
-              {!historyLoading && history.length === 0 && (
-                <div className="rounded-2xl py-12 text-center"
-                  style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
-                  <History className="mx-auto mb-2 h-9 w-9 opacity-15" />
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No closing records yet</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Previous end-of-day records will appear here</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {history.map(record => (
-                  <EodSummaryCard key={record.id} record={record} showMgrActions={isManager} />
-                ))}
-              </div>
+              <p className="text-sm font-bold" style={{ color: '#15803d' }}>Register already closed for today</p>
+              <p className="text-xs" style={{ color: '#166534' }}>
+                {todayRecord ? `Closed at ${fmtDate(todayRecord.closedAt)}` : ''}
+              </p>
             </div>
           </div>
-        )}
+          {todayRecord && <EodSummaryCard record={todayRecord} showMgrActions={isManager} />}
+        </div>
+      ) : (
+        <div className="mb-6 flex items-center gap-2 rounded-2xl p-4"
+          style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)' }}>
+          <Clock size={16} style={{ color: '#d97706' }} />
+          <p className="text-sm font-medium" style={{ color: '#92400e' }}>
+            Register is still open for <span className="font-bold">{today}</span>
+          </p>
+        </div>
+      )}
 
-        <p className="text-center text-[10px] uppercase tracking-widest opacity-30">
-          Records scoped to {user?.branchName ?? 'your branch'} · GH₵1.00 variance tolerance
-        </p>
+      {/* Just-closed success */}
+      {justClosed && !isClosed && (
+        <div className="mb-6">
+          <EodSummaryCard record={justClosed} showMgrActions={false} />
+        </div>
+      )}
+
+      {/* Close Register Form (only if not yet closed today) */}
+      {!isClosed && !justClosed && (
+        <div className="mb-8 rounded-2xl p-6" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+          <div className="mb-5 flex items-center gap-2">
+            <Banknote size={16} style={{ color: '#0d9488' }} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+              Count Your Register
+            </h2>
+          </div>
+          <CloseRegisterForm onSuccess={handleClosed} />
+        </div>
+      )}
+
+      {/* Payment Breakdown */}
+      <div className="mb-6 rounded-2xl p-6" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+        <div className="mb-4 flex items-center gap-2">
+          <TrendingUp size={15} style={{ color: '#2563eb' }} />
+          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+            Today's Payment Breakdown
+          </h2>
+        </div>
+        <PaymentBreakdownWidget />
+      </div>
+
+      {/* Manager team summary card */}
+      {isManager && (
+        <div className="mb-6">
+          <ManagerSummaryCard date={today} onManage={() => setView('team')} />
+        </div>
+      )}
+
+      {/* EOD History */}
+      {showHistory && (
+        <div className="mb-6 rounded-2xl p-6" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History size={15} style={{ color: 'var(--text-muted)' }} />
+              <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                Recent History
+              </h2>
+            </div>
+            {historyLoading && <RefreshCw size={14} className="animate-spin opacity-40" />}
+          </div>
+          {history.length === 0 && !historyLoading ? (
+            <p className="py-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No history found.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map(r => <EodSummaryCard key={r.id} record={r} showMgrActions={isManager} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quick nav */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/dashboard/transactions"
+          className="flex items-center gap-2 rounded-2xl border p-4 text-sm font-bold transition-all hover:opacity-80"
+          style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+          <Eye size={16} /> View Sales
+        </Link>
+        <Link href="/pos"
+          className="flex items-center gap-2 rounded-2xl border p-4 text-sm font-bold transition-all hover:opacity-80"
+          style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+          <CreditCard size={16} /> POS Terminal
+        </Link>
       </div>
     </div>
   );

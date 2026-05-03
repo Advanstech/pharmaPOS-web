@@ -216,10 +216,11 @@ export default function TransactionsPage() {
   const branchWideSales = !!user && isBranchWideSalesRole(user.role);
   const tableColCount = branchWideSales ? 11 : 10;
 
-  const { data, loading } = useQuery<{ recentSales: SaleRow[] }>(RECENT_SALES, {
+  const { data, loading, refetch: refetchSales } = useQuery<{ recentSales: SaleRow[] }>(RECENT_SALES, {
     variables: { limit: 60 },
     skip: !canQueryRecent,
-    pollInterval: 45_000,
+    fetchPolicy: 'network-only',
+    pollInterval: 30_000,
   });
   const [fetchSaleDetail] = useLazyQuery<{ sale: SaleRow }>(SALE_DETAIL, {
     fetchPolicy: 'network-only',
@@ -378,7 +379,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <motion.div
         className="mb-6"
         initial={shouldReduceMotion ? false : { opacity: 0, y: -8 }}
@@ -391,17 +392,10 @@ export default function TransactionsPage() {
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
           {branchWideSales ? 'Branch sales' : 'My sales'}
         </h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-          {branchWideSales ? (
-            <>
-              All completed checkouts at this branch from <code className="font-mono text-xs">recentSales</code> — owner,
-              manager, or platform admin view. Search by cashier, product, supplier, or type (OTC/POM).
-            </>
-          ) : (
-            <>
-              Only your POS checkouts (same cashier ID as your login). Managers and owners see the full branch register.
-            </>
-          )}
+        <p className="mt-1 text-sm hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+          {branchWideSales
+            ? 'All completed branch checkouts. Search by cashier, product, supplier, or type.'
+            : 'Your POS checkouts. Managers and owners see the full branch register.'}
         </p>
         {branchContextLine ? (
           <p className="mt-2 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -508,17 +502,29 @@ export default function TransactionsPage() {
             color: 'var(--text-primary)',
           }}
         />
-        {hasStructuredFilters ? (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={clearStructuredFilters}
-            className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)]"
+            onClick={() => refetchSales()}
+            disabled={loading}
+            className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
             style={{ color: 'var(--text-secondary)', borderColor: 'var(--surface-border)' }}
           >
-            <X size={16} aria-hidden />
-            Clear filters
+            <RotateCcw size={16} aria-hidden className={loading ? 'animate-spin' : ''} />
+            Refresh
           </button>
-        ) : null}
+          {hasStructuredFilters ? (
+            <button
+              type="button"
+              onClick={clearStructuredFilters}
+              className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors hover:bg-[var(--surface-hover)]"
+              style={{ color: 'var(--text-secondary)', borderColor: 'var(--surface-border)' }}
+            >
+              <X size={16} aria-hidden />
+              Clear filters
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div
@@ -652,22 +658,22 @@ export default function TransactionsPage() {
         className="overflow-x-auto rounded-xl"
         style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
       >
-        <table className="w-full min-w-[1040px] text-sm lg:min-w-0">
+        <table className="w-full min-w-[640px] text-sm lg:min-w-0">
           <thead>
             <tr
               className="text-left text-xs font-semibold uppercase tracking-wide"
               style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)', color: 'var(--text-secondary)' }}
             >
-              <th className="px-3 py-3 min-w-[120px]">Branch</th>
+              <th className="px-3 py-3 min-w-[120px] hidden md:table-cell">Branch</th>
               <th className="px-3 py-3 w-[120px]">Sale ID</th>
-              <th className="px-3 py-3 w-[100px]">Time (Accra)</th>
-              {branchWideSales ? <th className="px-3 py-3 min-w-[110px]">Cashier</th> : null}
-              <th className="px-3 py-3 min-w-[200px]">Products (type)</th>
-              <th className="px-3 py-3 w-[88px]">Type mix</th>
-              <th className="px-3 py-3 min-w-[100px]">Supplier</th>
-              <th className="px-3 py-3 w-[88px]">Stock</th>
-              <th className="px-3 py-3 w-[56px]">Qty</th>
-              <th className="px-3 py-3 min-w-[88px]">Total</th>
+              <th className="px-3 py-3 w-[80px] hidden sm:table-cell">Time</th>
+              {branchWideSales ? <th className="px-3 py-3 min-w-[100px] hidden sm:table-cell">Cashier</th> : null}
+              <th className="px-3 py-3 min-w-[160px]">Products</th>
+              <th className="px-3 py-3 w-[80px] hidden lg:table-cell">Type</th>
+              <th className="px-3 py-3 min-w-[90px] hidden md:table-cell">Supplier</th>
+              <th className="px-3 py-3 w-[72px] hidden sm:table-cell">Stock</th>
+              <th className="px-3 py-3 w-[44px] hidden md:table-cell">Qty</th>
+              <th className="px-3 py-3 min-w-[80px]">Total</th>
               <th className="px-3 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -700,7 +706,7 @@ export default function TransactionsPage() {
                       className="last:border-0 transition-colors hover:bg-[var(--surface-hover)]"
                       style={{ borderBottom: '1px solid var(--surface-border)' }}
                     >
-                      <td className="px-3 py-3 align-top text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <td className="px-3 py-3 align-top text-xs hidden md:table-cell" style={{ color: 'var(--text-secondary)' }}>
                         <span className="line-clamp-2 font-medium" title={tx.branchName}>
                           {tx.branchName ?? '—'}
                         </span>
@@ -733,14 +739,14 @@ export default function TransactionsPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-3" style={{ color: 'var(--text-muted)' }}>
+                      <td className="px-3 py-3 hidden sm:table-cell" style={{ color: 'var(--text-muted)' }}>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock size={12} aria-hidden />
                           {accraTime(whenIso)}
                         </span>
                       </td>
                       {branchWideSales ? (
-                        <td className="px-3 py-3 align-top text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        <td className="px-3 py-3 align-top text-sm hidden sm:table-cell" style={{ color: 'var(--text-secondary)' }}>
                           {tx.cashierName ?? '—'}
                         </td>
                       ) : null}
@@ -753,13 +759,13 @@ export default function TransactionsPage() {
                           {productsLabel}
                         </p>
                       </td>
-                      <td className="px-3 py-3 align-top text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                      <td className="px-3 py-3 align-top text-[11px] font-semibold uppercase tracking-wide hidden lg:table-cell" style={{ color: 'var(--text-secondary)' }}>
                         {typeMix}
                       </td>
-                      <td className="px-3 py-3 align-top text-xs" style={{ color: 'var(--text-secondary)' }} title={supplierBrief}>
+                      <td className="px-3 py-3 align-top text-xs hidden md:table-cell" style={{ color: 'var(--text-secondary)' }} title={supplierBrief}>
                         {supplierBrief}
                       </td>
-                      <td className="px-3 py-3 align-top">
+                      <td className="px-3 py-3 align-top hidden sm:table-cell">
                         <span
                           className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
                           style={{ background: pill.bg, color: pill.color }}
@@ -768,7 +774,7 @@ export default function TransactionsPage() {
                           {stockMeta.label}
                         </span>
                       </td>
-                      <td className="px-3 py-3 align-top font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                      <td className="px-3 py-3 align-top font-medium tabular-nums hidden md:table-cell" style={{ color: 'var(--text-secondary)' }}>
                         {nItems}
                       </td>
                       <td className="px-3 py-3">

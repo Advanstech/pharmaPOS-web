@@ -154,7 +154,7 @@ export default function BranchManagementPage() {
         borderBottom: '1px solid var(--surface-border)',
       }}>
         <div className="mx-auto max-w-[860px] px-4 pb-5 pt-6 md:px-6">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl"
                 style={{ background: 'rgba(13,148,136,0.1)' }}>
@@ -291,7 +291,7 @@ export default function BranchManagementPage() {
         )}
 
         {/* Branch list */}
-        <div className="rounded-2xl overflow-hidden"
+        <div className="rounded-2xl overflow-x-auto"
           style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between px-5 py-3"
             style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>

@@ -308,7 +308,7 @@ export default function ReceiveStockPage() {
 
   if (!canReceive) {
     return (
-      <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
         <p className="text-sm text-content-muted">You do not have permission to receive stock.</p>
       </div>
     );
@@ -353,7 +353,7 @@ export default function ReceiveStockPage() {
         <ArrowLeft size={14} /> Back to inventory
       </Link>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal/10 text-teal">
             <Truck size={20} />

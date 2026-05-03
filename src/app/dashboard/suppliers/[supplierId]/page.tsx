@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import {
   ArrowLeft,
   Phone,
@@ -21,11 +21,18 @@ import {
   ShoppingCart,
   List,
   LayoutGrid,
+  CheckSquare,
+  Square,
+  Trash2,
+  ArrowRightLeft,
+  FileText,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import {
   SUPPLIER_WITH_PRODUCTS_QUERY,
   SUPPLIER_RESTOCK_WATCH,
+  BULK_REASSIGN_PRODUCTS_TO_SUPPLIER,
+  SUPPLIERS_LIST_QUERY,
 } from '@/lib/graphql/suppliers.queries';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { Pagination } from '@/components/ui/pagination';
@@ -107,6 +114,43 @@ export default function SupplierDetailPage() {
   const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
   const itemsPerPage = 15;
 
+  // ── Bulk reassignment state ─────────────────────────────────────────────
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [targetSupplierId, setTargetSupplierId] = useState<string>('');
+  const [bulkActionError, setBulkActionError] = useState<string | null>(null);
+
+  const { data: suppliersData } = useQuery<{ suppliers: Array<{ id: string; name: string; isActive: boolean }> }>(
+    SUPPLIERS_LIST_QUERY,
+    { skip: !showBulkActions }
+  );
+  const otherSuppliers = (suppliersData?.suppliers ?? []).filter(s => s.id !== supplierId && s.isActive);
+
+  const [bulkReassign, { loading: bulkReassignLoading }] = useMutation(BULK_REASSIGN_PRODUCTS_TO_SUPPLIER, {
+    refetchQueries: [{ query: SUPPLIER_WITH_PRODUCTS_QUERY, variables: { id: supplierId } }],
+    onCompleted: () => {
+      setSelectedProducts(new Set());
+      setShowBulkActions(false);
+      setTargetSupplierId('');
+      setBulkActionError(null);
+    },
+    onError: (err) => {
+      setBulkActionError(err.message || 'Failed to reassign products');
+    },
+  });
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
   const { data, loading, error } = useQuery<{ supplierWithProducts: SupplierWithProducts }>(
     SUPPLIER_WITH_PRODUCTS_QUERY,
     { variables: { id: supplierId }, fetchPolicy: 'cache-and-network', skip: !supplierId },
@@ -136,6 +180,36 @@ export default function SupplierDetailPage() {
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // ── Bulk selection helpers (after paginated is defined) ───────────────────
+  const selectAllVisible = () => {
+    const visibleIds = paginated.map(p => p.id);
+    const allSelected = visibleIds.every(id => selectedProducts.has(id));
+    if (allSelected) {
+      setSelectedProducts(prev => {
+        const next = new Set(prev);
+        visibleIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedProducts(prev => {
+        const next = new Set(prev);
+        visibleIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkReassign = async (removeSupplier: boolean = false) => {
+    if (selectedProducts.size === 0) return;
+    setBulkActionError(null);
+    await bulkReassign({
+      variables: {
+        productIds: Array.from(selectedProducts),
+        supplierId: removeSupplier ? null : targetSupplierId || null,
+      },
+    });
+  };
 
   const alertLevel = stats.out > 0 || stats.critical > 0 ? 'red' : stats.low > 0 ? 'amber' : 'green';
   const alertColors = {
@@ -221,6 +295,14 @@ export default function SupplierDetailPage() {
                 </div>
                 {canManage && (
                   <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/dashboard/supplier-invoices?supplier=${supplierId}`}
+                      className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105"
+                      style={{ color: 'var(--color-teal)', background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.25)' }}
+                    >
+                      <FileText size={15} />
+                      View Invoices
+                    </Link>
                     <Link
                       href="/dashboard/invoices/upload"
                       className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105"
@@ -322,15 +404,94 @@ export default function SupplierDetailPage() {
                   Thumbnails
                 </button>
               </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkActions(!showBulkActions);
+                    if (showBulkActions) setSelectedProducts(new Set());
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150"
+                  style={showBulkActions ? { background: 'var(--color-teal)', color: '#fff' } : { color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}
+                >
+                  <ArrowRightLeft size={13} />
+                  {showBulkActions ? 'Done' : 'Reassign'}
+                </button>
+              )}
             </div>
+
+            {/* Bulk Actions Panel */}
+            {showBulkActions && canManage && (
+              <div className="mb-4 rounded-xl p-3" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)' }}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={selectAllVisible}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      {paginated.every(p => selectedProducts.has(p.id)) ? <CheckSquare size={14} /> : <Square size={14} />}
+                      Select All Visible
+                    </button>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {selectedProducts.size} selected
+                    </span>
+                  </div>
+                  {selectedProducts.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {bulkActionError && (
+                        <span className="text-xs text-red-600">{bulkActionError}</span>
+                      )}
+                      <select
+                        value={targetSupplierId}
+                        onChange={(e) => setTargetSupplierId(e.target.value)}
+                        className="rounded-lg border px-2 py-1.5 text-xs"
+                        style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-base)' }}
+                      >
+                        <option value="">Move to supplier…</option>
+                        {otherSuppliers.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkReassign(false)}
+                        disabled={!targetSupplierId || bulkReassignLoading}
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                        style={{ background: 'var(--color-teal)' }}
+                      >
+                        {bulkReassignLoading ? 'Moving…' : 'Move'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkReassign(true)}
+                        disabled={bulkReassignLoading}
+                        className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                        style={{ borderColor: 'rgba(220,38,38,0.3)' }}
+                      >
+                        <Trash2 size={12} />
+                        Remove Supplier
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {filtered.length > 0 && productView === 'list' && (
               <div className="overflow-hidden rounded-2xl" style={{ border: '1px solid var(--surface-border)', background: 'var(--surface-card)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
               {/* Table header */}
               <div
                 className="hidden items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-wider lg:grid"
-                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.02)', gridTemplateColumns: '40px 1fr 80px 90px 120px 90px 90px 120px' }}
+                style={{
+                  color: 'var(--text-muted)',
+                  borderBottom: '1px solid var(--surface-border)',
+                  background: 'rgba(0,0,0,0.02)',
+                  gridTemplateColumns: showBulkActions ? '40px 40px 1fr 80px 90px 120px 90px 90px 120px' : '40px 1fr 80px 90px 120px 90px 90px 120px'
+                }}
               >
+                {showBulkActions && <span />}
                 <span />
                 <span>Product</span>
                 <span>Class</span>
@@ -343,12 +504,31 @@ export default function SupplierDetailPage() {
 
               {paginated.map((product) => {
                 const pct = Math.min(100, (product.quantityOnHand / Math.max(product.reorderLevel * 2, 1)) * 100);
+                const isSelected = selectedProducts.has(product.id);
                 return (
                   <div
                     key={product.id}
                     className="grid items-center gap-3 border-b px-4 py-3 transition-colors hover:bg-[var(--surface-base)] last:border-0"
-                    style={{ borderColor: 'var(--surface-border)', gridTemplateColumns: '40px 1fr auto' }}
+                    style={{
+                      borderColor: 'var(--surface-border)',
+                      gridTemplateColumns: showBulkActions ? '40px 40px 1fr auto' : '40px 1fr auto',
+                      background: isSelected ? 'rgba(13,148,136,0.05)' : undefined
+                    }}
                   >
+                    {/* Checkbox for bulk selection */}
+                    {showBulkActions && (
+                      <button
+                        type="button"
+                        onClick={() => toggleProductSelection(product.id)}
+                        className="flex items-center justify-center"
+                      >
+                        {isSelected ? (
+                          <CheckSquare size={18} style={{ color: 'var(--color-teal)' }} />
+                        ) : (
+                          <Square size={18} style={{ color: 'var(--text-muted)' }} />
+                        )}
+                      </button>
+                    )}
                     {/* Visual + name — mobile layout */}
                     <PharmaProductVisual productName={product.name} productId={product.id} size="sm" />
 
@@ -425,15 +605,34 @@ export default function SupplierDetailPage() {
 
             {filtered.length > 0 && productView === 'thumbnails' && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {paginated.map((product) => (
-                  <div
-                    key={product.id}
-                    className="overflow-hidden rounded-xl border transition-shadow hover:shadow-md"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-card)' }}
-                  >
-                    <div className="flex gap-3 p-4">
-                      <PharmaProductVisual productName={product.name} productId={product.id} size="sm" />
-                      <div className="min-w-0 flex-1">
+                {paginated.map((product) => {
+                  const isThumbSelected = selectedProducts.has(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      className="overflow-hidden rounded-xl border transition-shadow hover:shadow-md"
+                      style={{
+                        borderColor: isThumbSelected ? 'var(--color-teal)' : 'var(--surface-border)',
+                        background: isThumbSelected ? 'rgba(13,148,136,0.05)' : 'var(--surface-card)',
+                        boxShadow: isThumbSelected ? '0 0 0 2px var(--color-teal)' : undefined
+                      }}
+                    >
+                      <div className="flex gap-3 p-4">
+                        {showBulkActions && (
+                          <button
+                            type="button"
+                            onClick={() => toggleProductSelection(product.id)}
+                            className="flex shrink-0 items-center justify-center"
+                          >
+                            {isThumbSelected ? (
+                              <CheckSquare size={20} style={{ color: 'var(--color-teal)' }} />
+                            ) : (
+                              <Square size={20} style={{ color: 'var(--text-muted)' }} />
+                            )}
+                          </button>
+                        )}
+                        <PharmaProductVisual productName={product.name} productId={product.id} size="sm" />
+                        <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <Link
                             href={`/dashboard/inventory/${product.id}`}
@@ -494,7 +693,8 @@ export default function SupplierDetailPage() {
                       </Link>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
 

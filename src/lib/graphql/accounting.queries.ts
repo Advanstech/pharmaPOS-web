@@ -88,16 +88,27 @@ export const WORKING_CAPITAL = gql`
 `;
 
 export const SUPPLIER_INVOICES = gql`
-  query SupplierInvoices {
-    supplierInvoices {
+  query SupplierInvoices($supplierId: ID) {
+    supplierInvoices(supplierId: $supplierId) {
       id
       supplierId
       supplierName
       invoiceNumber
+      invoiceDate
       dueDate
       status
+      totalAmountPesewas
+      totalAmountFormatted
+      paidAmountPesewas
+      paidAmountFormatted
       balancePesewas
       balanceFormatted
+      paymentProgressPct
+      paymentStatus
+      daysOutstanding
+      isOverdue
+      overdueByDays
+      grnId
     }
   }
 `;

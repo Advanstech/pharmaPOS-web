@@ -152,3 +152,9 @@ export const SUPPLIERS_LIST_ALL_QUERY = gql`
     }
   }
 `;
+
+export const BULK_REASSIGN_PRODUCTS_TO_SUPPLIER = gql`
+  mutation BulkReassignProductsToSupplier($productIds: [String!]!, $supplierId: String) {
+    bulkReassignProductsToSupplier(productIds: $productIds, supplierId: $supplierId)
+  }
+`;

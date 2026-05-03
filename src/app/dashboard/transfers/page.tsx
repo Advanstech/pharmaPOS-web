@@ -80,7 +80,7 @@ export default function StockTransfersPage() {
       {/* Hero */}
       <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(59,130,246,0.06) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
         <div className="mx-auto max-w-[1400px] px-4 pt-5 pb-4 md:px-6">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <Link href="/dashboard" className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline">
                 <ArrowLeft className="h-3.5 w-3.5" /> Dashboard

@@ -6,6 +6,7 @@ export const LIST_STAFF = gql`
       id
       name
       email
+      phone
       role
       branch_id
       is_active
@@ -33,6 +34,7 @@ export const STAFF_MEMBER = gql`
       id
       name
       email
+      phone
       role
       branch_id
       is_active
@@ -73,9 +75,25 @@ export const DEACTIVATE_STAFF = gql`
   }
 `;
 
+export const DELETE_STAFF = gql`
+  mutation DeleteStaff($userId: ID!) {
+    deleteStaff(userId: $userId)
+  }
+`;
+
 export const RESET_STAFF_PASSWORD = gql`
   mutation ResetStaffPassword($input: ResetStaffPasswordInput!) {
     resetStaffPassword(input: $input)
+  }
+`;
+
+export const GENERATE_STAFF_PASSWORD = gql`
+  mutation GenerateStaffPassword($userId: ID!) {
+    generateStaffPassword(userId: $userId) {
+      userId
+      name
+      temporaryPassword
+    }
   }
 `;
 
