@@ -8,13 +8,13 @@ import {
   UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye, EyeOff,
   LayoutGrid, List, Search, Filter, X, Wifi, WifiOff, Clock, Building2,
   TrendingUp, Users, UserCheck, AlertCircle, ChevronDown, Banknote,
-  GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase, Activity, Trash2,
+  GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase, Activity, Trash2, RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   LIST_STAFF, STAFF_MEMBER, STAFF_SESSION_HISTORY,
   INVITE_STAFF, DEACTIVATE_STAFF, DELETE_STAFF, RESET_STAFF_PASSWORD, UPDATE_STAFF_PROFILE,
-  STAFF_ACTIVITY_LOG, GENERATE_STAFF_PASSWORD,
+  STAFF_ACTIVITY_LOG, GENERATE_STAFF_PASSWORD, SYNC_STAFF_SALES,
 } from '@/lib/graphql/dashboard.queries';
 import { formatApolloError } from '@/lib/apollo/format-apollo-error';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -241,7 +241,7 @@ function StaffKpiBar({ staff }: { staff: StaffMember[] }) {
 // ── Staff card (grid view) ────────────────────────────────────────────────────
 
 function StaffCard({
-  member, canManage, currentUserId, onView, onEdit, onDeactivate, onDelete, onResetPw, onGeneratePw,
+  member, canManage, currentUserId, onView, onEdit, onDeactivate, onDelete, onResetPw, onGeneratePw, onSyncSales,
 }: {
   member: StaffMember;
   canManage: boolean;
@@ -252,6 +252,7 @@ function StaffCard({
   onDelete: () => void;
   onResetPw: () => void;
   onGeneratePw: () => void;
+  onSyncSales: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const rc = ROLE_COLORS[member.role] ?? ROLE_COLORS.cashier;
@@ -335,6 +336,7 @@ function StaffCard({
                   { icon: PencilLine, label: 'Edit profile', action: onEdit },
                   { icon: KeyRound, label: 'Generate password', action: onGeneratePw },
                   { icon: KeyRound, label: 'Reset password', action: onResetPw },
+                  { icon: RefreshCw, label: 'Sync sales records', action: onSyncSales },
                 ].map(({ icon: Icon, label, action }) => (
                   <button key={label} onClick={() => { setMenuOpen(false); action(); }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-[var(--surface-hover)]"
@@ -607,6 +609,7 @@ export default function StaffPage() {
   const [deleteStaff] = useMutation(DELETE_STAFF, { onCompleted: () => refetch() });
   const [resetPassword] = useMutation(RESET_STAFF_PASSWORD);
   const [generatePassword] = useMutation(GENERATE_STAFF_PASSWORD);
+  const [syncSales] = useMutation(SYNC_STAFF_SALES);
   const [updateStaffProfile] = useMutation(UPDATE_STAFF_PROFILE, { onCompleted: () => refetch() });
   const [generatedPw, setGeneratedPw] = useState<{ name: string; email?: string; password: string } | null>(null);
 
@@ -693,6 +696,18 @@ export default function StaffPage() {
     } finally {
       setResetPwLoading(false);
     }
+  }
+
+  function handleSyncSales(member: StaffMember) {
+    void (async () => {
+      try {
+        const { data } = await syncSales({ variables: { input: { userId: member.id } } });
+        const result = data?.syncStaffSales;
+        toastSuccess(`Sales synced for ${member.name}`, result?.message ?? `${result?.assignedCount ?? 0} sales assigned`);
+      } catch (err: unknown) {
+        toastError('Sync failed', err instanceof Error ? err.message : 'Unknown error');
+      }
+    })();
   }
 
   function handleDeactivate(member: StaffMember) {
@@ -1024,6 +1039,7 @@ export default function StaffPage() {
                         onDelete={() => handleDelete(member)}
                         onResetPw={() => handleResetPw(member)}
                         onGeneratePw={() => handleGeneratePw(member)}
+                        onSyncSales={() => handleSyncSales(member)}
                       />
                     ))}
                   </AnimatePresence>
@@ -1124,6 +1140,7 @@ export default function StaffPage() {
                                   onDelete={() => handleDelete(member)}
                                   onResetPw={() => handleResetPw(member)}
                                   onGeneratePw={() => handleGeneratePw(member)}
+                                  onSyncSales={() => handleSyncSales(member)}
                                 />
                               </td>
                             )}
@@ -1224,9 +1241,9 @@ export default function StaffPage() {
 
 // ── List row menu ─────────────────────────────────────────────────────────────
 
-function ListRowMenu({ member, isLast, currentUserId, onView, onEdit, onDeactivate, onDelete, onResetPw, onGeneratePw }: {
+function ListRowMenu({ member, isLast, currentUserId, onView, onEdit, onDeactivate, onDelete, onResetPw, onGeneratePw, onSyncSales }: {
   member: StaffMember; isLast: boolean; currentUserId?: string;
-  onView: () => void; onEdit: () => void; onDeactivate: () => void; onDelete: () => void; onResetPw: () => void; onGeneratePw: () => void;
+  onView: () => void; onEdit: () => void; onDeactivate: () => void; onDelete: () => void; onResetPw: () => void; onGeneratePw: () => void; onSyncSales: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -1248,6 +1265,7 @@ function ListRowMenu({ member, isLast, currentUserId, onView, onEdit, onDeactiva
               { icon: PencilLine, label: 'Edit profile', action: onEdit },
               { icon: KeyRound, label: 'Generate password', action: onGeneratePw },
               { icon: KeyRound, label: 'Reset password', action: onResetPw },
+              { icon: RefreshCw, label: 'Sync sales records', action: onSyncSales },
             ].map(({ icon: Icon, label, action }) => (
               <button key={label} onClick={() => { setOpen(false); action(); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-[var(--surface-hover)]"
