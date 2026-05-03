@@ -5,7 +5,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import {
-  UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye,
+  UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye, EyeOff,
   LayoutGrid, List, Search, Filter, X, Wifi, WifiOff, Clock, Building2,
   TrendingUp, Users, UserCheck, AlertCircle, ChevronDown, Banknote,
   GraduationCap, Phone, MapPin, Calendar, BadgeCheck, Briefcase, Activity, Trash2,
@@ -21,7 +21,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { formatAccraDate, cn } from '@/lib/utils';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
-import { useToast, useConfirm, usePrompt } from '@/components/ui/toast';
+import { useToast, useConfirm } from '@/components/ui/toast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -554,7 +554,6 @@ export default function StaffPage() {
   const { user } = useAuthStore();
   const { success: toastSuccess, error: toastError } = useToast();
   const { confirm } = useConfirm();
-  const { prompt } = usePrompt();
   const shouldReduceMotion = useReducedMotion();
   const [tab, setTab] = useState<'roster' | 'activity'>('roster');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -572,6 +571,12 @@ export default function StaffPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [detailTarget, setDetailTarget] = useState<StaffMember | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(true);
+  const [resetPwTarget, setResetPwTarget] = useState<StaffMember | null>(null);
+  const [resetPwNew, setResetPwNew] = useState('');
+  const [resetPwConfirm, setResetPwConfirm] = useState('');
+  const [resetPwShow, setResetPwShow] = useState(false);
+  const [resetPwLoading, setResetPwLoading] = useState(false);
+  const [resetPwError, setResetPwError] = useState('');
 
   const {
     data,
@@ -666,17 +671,28 @@ export default function StaffPage() {
   }
 
   function handleResetPw(member: StaffMember) {
-    void (async () => {
-      const value = await prompt({ title: `Reset password for ${member.name}`, placeholder: 'New password (min 8 chars)', required: true, confirmLabel: 'Reset Password' });
-      const pw = value?.trim();
-      if (!pw || pw.length < 8) return;
-      try {
-        await resetPassword({ variables: { input: { userId: member.id, newPassword: pw } } });
-        toastSuccess(`Password reset for ${member.name}`);
-      } catch (err: unknown) {
-        toastError('Reset failed', err instanceof Error ? err.message : 'Unknown error');
-      }
-    })();
+    setResetPwTarget(member);
+    setResetPwNew('');
+    setResetPwConfirm('');
+    setResetPwShow(false);
+    setResetPwError('');
+  }
+
+  async function submitResetPw() {
+    if (!resetPwTarget) return;
+    if (resetPwNew.length < 8) { setResetPwError('Password must be at least 8 characters.'); return; }
+    if (resetPwNew !== resetPwConfirm) { setResetPwError('Passwords do not match.'); return; }
+    setResetPwLoading(true);
+    setResetPwError('');
+    try {
+      await resetPassword({ variables: { input: { userId: resetPwTarget.id, newPassword: resetPwNew } } });
+      toastSuccess(`Password reset for ${resetPwTarget.name}`);
+      setResetPwTarget(null);
+    } catch (err: unknown) {
+      setResetPwError(err instanceof Error ? err.message : 'Reset failed. Please try again.');
+    } finally {
+      setResetPwLoading(false);
+    }
   }
 
   function handleDeactivate(member: StaffMember) {
@@ -689,6 +705,109 @@ export default function StaffPage() {
 
   return (
     <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      {/* Reset password modal */}
+      <AnimatePresence>
+        {resetPwTarget && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !resetPwLoading && setResetPwTarget(null)}
+          >
+            <motion.div
+              className="w-full max-w-sm rounded-2xl p-6 space-y-4"
+              style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(13,148,136,0.1)' }}>
+                    <KeyRound size={18} style={{ color: '#0d9488' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Reset Password</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{resetPwTarget.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setResetPwTarget(null)} className="rounded-lg p-1.5 hover:bg-[rgba(0,0,0,0.06)] transition-colors" disabled={resetPwLoading}>
+                  <X size={16} style={{ color: 'var(--text-muted)' }} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  New password
+                  <div className="relative mt-1">
+                    <input
+                      autoFocus
+                      type={resetPwShow ? 'text' : 'password'}
+                      value={resetPwNew}
+                      onChange={e => { setResetPwNew(e.target.value); setResetPwError(''); }}
+                      onKeyDown={e => { if (e.key === 'Enter') void submitResetPw(); }}
+                      placeholder="Min 8 characters"
+                      className="w-full rounded-xl border px-3 py-2.5 pr-10 text-sm outline-none"
+                      style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setResetPwShow(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {resetPwShow ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </label>
+
+                <label className="block text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  Confirm password
+                  <input
+                    type={resetPwShow ? 'text' : 'password'}
+                    value={resetPwConfirm}
+                    onChange={e => { setResetPwConfirm(e.target.value); setResetPwError(''); }}
+                    onKeyDown={e => { if (e.key === 'Enter') void submitResetPw(); }}
+                    placeholder="Repeat new password"
+                    className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                    style={{ background: 'var(--surface-base)', borderColor: resetPwError && resetPwConfirm && resetPwNew !== resetPwConfirm ? '#dc2626' : 'var(--surface-border)', color: 'var(--text-primary)' }}
+                  />
+                </label>
+              </div>
+
+              {resetPwError && (
+                <p className="rounded-lg px-3 py-2 text-xs font-medium text-red-700" style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                  {resetPwError}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setResetPwTarget(null)}
+                  disabled={resetPwLoading}
+                  className="flex-1 rounded-xl border py-2.5 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+                  style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void submitResetPw()}
+                  disabled={resetPwLoading || resetPwNew.length < 8 || resetPwNew !== resetPwConfirm}
+                  className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  style={{ background: 'var(--color-teal)' }}
+                >
+                  {resetPwLoading ? 'Saving…' : 'Reset Password'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Generated password modal */}
       {generatedPw && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>

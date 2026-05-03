@@ -28,6 +28,7 @@ interface CustomerRow {
   sex?: string | null;
   ageYears?: number | null;
   hasGhanaCard: boolean;
+  notes?: string | null;
   createdAt: string;
 }
 
@@ -115,6 +116,7 @@ export default function CustomersPage() {
     const ageStr = (fd.get('ageYears') as string)?.trim();
     const ageYears = ageStr ? parseInt(ageStr, 10) : undefined;
     const gh = (fd.get('ghanaCard') as string)?.trim() || undefined;
+    const notes = (fd.get('notes') as string)?.trim() || undefined;
     try {
       await createCustomer({
         variables: {
@@ -125,6 +127,7 @@ export default function CustomersPage() {
             ...(sexRaw ? { sex: sexRaw } : {}),
             ...(ageYears != null && !Number.isNaN(ageYears) ? { ageYears } : {}),
             ...(gh ? { ghanaCardNumber: gh } : {}),
+            ...(notes ? { notes } : {}),
           },
         },
       });
@@ -147,6 +150,7 @@ export default function CustomersPage() {
     const ageStr = (fd.get('ageYears') as string)?.trim();
     const gh = (fd.get('ghanaCard') as string)?.trim() ?? '';
     const removeGhana = fd.get('removeGhana') === 'on';
+    const notes = (fd.get('notes') as string)?.trim() ?? '';
     const input: Record<string, unknown> = {
       customerId: editRow.id,
       name,
@@ -157,6 +161,7 @@ export default function CustomersPage() {
     if (removeGhana) input.ghanaCardNumber = '';
     else if (gh.length > 0) input.ghanaCardNumber = gh;
     if (sexRaw) input.sex = sexRaw;
+    if (notes.length > 0) input.notes = notes;
     if (ageStr === '') {
       input.ageYears = null;
     } else if (ageStr) {
@@ -196,7 +201,7 @@ export default function CustomersPage() {
           </div>
           <p className="mt-1 text-sm text-content-secondary max-w-xl">
             Branch directory: public <span className="font-mono font-semibold">PP-</span> codes for receipts,
-            optional demographics and Ghana Card (stored encrypted). POS can attach a customer without opening
+            optional demographics, Ghana Card, and clinical notes (stored encrypted). POS can attach a customer without opening
             this page.
           </p>
         </div>
@@ -257,6 +262,16 @@ export default function CustomersPage() {
                   placeholder="Encrypted at rest"
                 />
               </label>
+              <label className="block text-xs font-semibold text-content-secondary sm:col-span-2">
+                Clinical notes / diagnosis (encrypted)
+                <textarea
+                  name="notes"
+                  rows={3}
+                  maxLength={2000}
+                  className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm"
+                  placeholder="Medical history, allergies, observations..."
+                />
+              </label>
             </div>
             <button
               type="submit"
@@ -276,7 +291,7 @@ export default function CustomersPage() {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="Search by PP- code or UUID fragment…"
+          placeholder="Search by PP- code, email, or notes…"
           aria-label="Search customers"
         />
       </div>
@@ -298,6 +313,7 @@ export default function CustomersPage() {
               <th className="px-4 py-3 hidden lg:table-cell">Age</th>
               <th className="px-4 py-3 hidden sm:table-cell">Phone</th>
               <th className="px-4 py-3 hidden lg:table-cell">Ghana Card</th>
+              <th className="px-4 py-3 hidden lg:table-cell">Notes</th>
               <th className="px-4 py-3 hidden md:table-cell">Since</th>
               <th className="px-4 py-3 w-32">Actions</th>
             </tr>
@@ -305,14 +321,14 @@ export default function CustomersPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={canEdit ? 8 : 7} className="px-4 py-8 text-center text-content-muted">
+                <td colSpan={canEdit ? 10 : 9} className="px-4 py-8 text-center text-content-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && pagedRows.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 8 : 7} className="px-4 py-8 text-center text-content-muted">
+                <td colSpan={canEdit ? 10 : 9} className="px-4 py-8 text-center text-content-muted">
                   No customers match.
                 </td>
               </tr>
@@ -329,6 +345,15 @@ export default function CustomersPage() {
                   <td className="px-4 py-3 hidden lg:table-cell">{r.ageYears != null ? r.ageYears : '—'}</td>
                   <td className="px-4 py-3 hidden sm:table-cell">{r.hasPhone ? 'On file' : '—'}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">{r.hasGhanaCard ? 'On file' : '—'}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    {r.notes ? (
+                      <span className="line-clamp-1 text-xs text-content-secondary" title={r.notes}>
+                        {r.notes}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-content-muted hidden md:table-cell">{formatAccraDate(r.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
@@ -455,6 +480,17 @@ export default function CustomersPage() {
                 <label className="flex items-center gap-2 text-xs text-content-secondary sm:col-span-2">
                   <input type="checkbox" name="removeGhana" className="rounded border-surface-border" />
                   Remove stored Ghana Card
+                </label>
+                <label className="block text-xs font-semibold text-content-secondary sm:col-span-2">
+                  Clinical notes / diagnosis (encrypted)
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    maxLength={2000}
+                    defaultValue={editRow.notes ?? ''}
+                    className="mt-1 w-full rounded-lg border border-surface-border px-3 py-2 text-sm"
+                    placeholder="Medical history, allergies, observations..."
+                  />
                 </label>
               </div>
               {updateError && (

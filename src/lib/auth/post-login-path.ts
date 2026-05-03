@@ -7,10 +7,10 @@ export function postLoginPathForRole(role: string): string {
   switch (role) {
     case 'cashier':
     case 'chemical_cashier':
+    case 'pharmacist':
       return '/pos';
     case 'technician':
       return '/dashboard/dispensing';
-    case 'pharmacist':
     case 'head_pharmacist':
       return '/dashboard/prescriptions';
     case 'manager':

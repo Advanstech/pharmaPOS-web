@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import type { Product } from '@/types';
 import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
-import { SUPPLIERS_LIST_QUERY } from '@/lib/graphql/suppliers.queries';
+import { SUPPLIERS_LIST_QUERY, SUPPLIER_WITH_PRODUCTS_QUERY } from '@/lib/graphql/suppliers.queries';
 import { LATEST_PRODUCT_COSTS, PRODUCT_PRICE_HISTORY } from '@/lib/graphql/pricing.queries';
 import { UPDATE_PRODUCT_PRICE, BULK_UPDATE_PRODUCT_PRICES } from '@/lib/graphql/pricing.mutations';
 import { Pagination } from '@/components/ui/pagination';
@@ -46,6 +46,9 @@ export default function PricingPage() {
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
   const [defaultMargin, setDefaultMargin] = useState(25);
   const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [supplierSheetMode, setSupplierSheetMode] = useState(false);
+  const [supplierEdits, setSupplierEdits] = useState<Record<string, { price: string; reason: string }>>({});
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
@@ -93,6 +96,15 @@ export default function PricingPage() {
 
   const [updatePrice, { loading: updating }] = useMutation(UPDATE_PRODUCT_PRICE);
   const [bulkUpdate, { loading: bulkUpdating }] = useMutation(BULK_UPDATE_PRODUCT_PRICES);
+
+  // Fetch supplier products when in sheet mode
+  const { data: supplierProductsData, loading: supplierProductsLoading, refetch: refetchSupplierProducts } = useQuery<
+    { supplierWithProducts: { id: string; name: string; products: Array<{ id: string; name: string; genericName?: string; barcode?: string; unitPrice: number; quantityOnHand: number; stockStatus: string }> } }
+  >(
+    SUPPLIER_WITH_PRODUCTS_QUERY,
+    { variables: { id: selectedSupplierId ?? '' }, skip: !supplierSheetMode || !selectedSupplierId, fetchPolicy: 'cache-and-network' }
+  );
+  const supplierProducts = supplierProductsData?.supplierWithProducts?.products ?? [];
 
   // Build rows with margin calculations
   const rows = useMemo(() => {
@@ -186,6 +198,68 @@ export default function PricingPage() {
       await bulkUpdate({ variables: { input: { updates } } });
       setSuccess(updates.length + ' prices updated'); refetch();
       setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) { setError(e?.message || 'Bulk update failed'); }
+  };
+
+  // Supplier sheet mode handlers
+  const handleEnterSupplierSheet = () => {
+    if (!selectedSupplierId) return;
+    setSupplierSheetMode(true);
+    setSupplierEdits({});
+  };
+
+  const handleExitSupplierSheet = () => {
+    setSupplierSheetMode(false);
+    setSupplierEdits({});
+  };
+
+  const handleSupplierPriceChange = (productId: string, price: string) => {
+    setSupplierEdits(prev => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || { reason: '' }), price }
+    }));
+  };
+
+  const handleSupplierReasonChange = (productId: string, reason: string) => {
+    setSupplierEdits(prev => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || { price: '' }), reason }
+    }));
+  };
+
+  const handleSaveSupplierProductPrice = async (productId: string, currentPrice: number) => {
+    const edit = supplierEdits[productId];
+    if (!edit || !edit.price) return;
+    const pp = Math.round(parseFloat(edit.price) * 100);
+    if (isNaN(pp) || pp <= 0) { setError('Enter a valid price'); return; }
+    setSavingProductId(productId);
+    setError(null); setSuccess(null);
+    try {
+      await updatePrice({ variables: { input: { productId, unitPriceGhsPesewas: pp, reason: edit.reason?.trim() || 'Supplier price update' } } });
+      setSuccess('Price updated');
+      setSupplierEdits(prev => { const n = { ...prev }; delete n[productId]; return n; });
+      setTimeout(() => setSuccess(null), 2000);
+      refetchSupplierProducts();
+    } catch (e: any) { setError(e?.message || 'Failed to update price'); }
+    finally { setSavingProductId(null); }
+  };
+
+  const handleSaveAllSupplierPrices = async () => {
+    const updates = Object.entries(supplierEdits)
+      .filter(([, edit]) => edit.price && parseFloat(edit.price) > 0)
+      .map(([productId, edit]) => ({
+        productId,
+        unitPriceGhsPesewas: Math.round(parseFloat(edit.price) * 100),
+        reason: edit.reason?.trim() || 'Supplier price update',
+      }));
+    if (updates.length === 0) { setError('No price changes to save'); return; }
+    setError(null); setSuccess(null);
+    try {
+      await bulkUpdate({ variables: { input: { updates } } });
+      setSuccess(`${updates.length} prices updated`);
+      setSupplierEdits({});
+      setTimeout(() => setSuccess(null), 3000);
+      refetchSupplierProducts();
     } catch (e: any) { setError(e?.message || 'Bulk update failed'); }
   };
 
@@ -381,8 +455,20 @@ export default function PricingPage() {
             )}
           </div>
 
+          {/* View Supplier Price Sheet button */}
+          {selectedSupplierId && !supplierSheetMode && (
+            <button
+              onClick={handleEnterSupplierSheet}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-all hover:scale-[1.02]"
+              style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.25)' }}
+            >
+              <Package size={14} />
+              View Supplier Price Sheet
+            </button>
+          )}
+
           {/* Clear Filters */}
-          {(selectedSupplierId || query) && (
+          {(selectedSupplierId || query) && !supplierSheetMode && (
             <button
               onClick={() => { setSelectedSupplierId(null); setQuery(''); }}
               className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors hover:bg-red-50"
@@ -407,6 +493,22 @@ export default function PricingPage() {
           </div>
         </div>
 
+        {/* Supplier Price Sheet Mode */}
+        {supplierSheetMode && selectedSupplierId ? (
+          <SupplierPriceSheet
+            supplierName={selectedSupplier?.name ?? ''}
+            products={supplierProducts}
+            edits={supplierEdits}
+            onPriceChange={handleSupplierPriceChange}
+            onReasonChange={handleSupplierReasonChange}
+            onSaveProduct={handleSaveSupplierProductPrice}
+            onSaveAll={handleSaveAllSupplierPrices}
+            onExit={handleExitSupplierSheet}
+            loading={supplierProductsLoading}
+            savingProductId={savingProductId}
+            hasChanges={Object.keys(supplierEdits).length > 0}
+          />
+        ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
           {/* Product pricing table */}
           <div className="rounded-2xl overflow-x-auto" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
@@ -517,6 +619,7 @@ export default function PricingPage() {
           {/* Price History Sidebar */}
           <PriceHistorySidebar selectedId={selectedId} historyData={historyData?.productPriceHistory ?? []} historyLoading={historyLoading} />
         </div>
+        )}
       </div>
     </div>
   );
@@ -562,6 +665,217 @@ function PriceReasonSuggestions({ current, onSelect }: { current: string; onSele
           {reason}
         </button>
       ))}
+    </div>
+  );
+}
+
+function SupplierPriceSheet({
+  supplierName,
+  products,
+  edits,
+  onPriceChange,
+  onReasonChange,
+  onSaveProduct,
+  onSaveAll,
+  onExit,
+  loading,
+  savingProductId,
+  hasChanges,
+}: {
+  supplierName: string;
+  products: Array<{ id: string; name: string; genericName?: string; barcode?: string; unitPrice: number; quantityOnHand: number; stockStatus: string }>;
+  edits: Record<string, { price: string; reason: string }>;
+  onPriceChange: (productId: string, price: string) => void;
+  onReasonChange: (productId: string, reason: string) => void;
+  onSaveProduct: (productId: string, currentPrice: number) => void;
+  onSaveAll: () => void;
+  onExit: () => void;
+  loading: boolean;
+  savingProductId: string | null;
+  hasChanges: boolean;
+}) {
+  const [globalReason, setGlobalReason] = useState('');
+  const pendingCount = Object.keys(edits).filter(id => edits[id]?.price).length;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4" style={{ background: 'rgba(13,148,136,0.06)', borderBottom: '1px solid var(--surface-border)' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center rounded-lg" style={{ background: 'rgba(13,148,136,0.12)', width: 40, height: 40 }}>
+            <Truck size={20} style={{ color: '#0d9488' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{supplierName}</h3>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Supplier Price Sheet — {products.length} products</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <button
+              onClick={onSaveAll}
+              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: '#0d9488' }}
+            >
+              <CheckCircle size={14} />
+              Save All ({pendingCount})
+            </button>
+          )}
+          <button
+            onClick={onExit}
+            className="rounded-lg px-3 py-2 text-xs font-semibold transition-colors hover:bg-gray-100"
+            style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}
+          >
+            Exit Sheet
+          </button>
+        </div>
+      </div>
+
+      {/* Global reason input */}
+      <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--surface-border)', background: 'rgba(0,0,0,0.02)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Default reason for all changes:</span>
+        <input
+          value={globalReason}
+          onChange={e => setGlobalReason(e.target.value)}
+          placeholder="e.g. Supplier price increase, Annual review..."
+          className="flex-1 max-w-md rounded-lg border px-3 py-1.5 text-xs"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Applied to empty reason fields</span>
+      </div>
+
+      {/* Products table */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[800px]">
+          {/* Header */}
+          <div className="grid items-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.02)', gridTemplateColumns: '2fr 1fr 100px 140px 140px 100px' }}>
+            <span>Product</span>
+            <span>Barcode</span>
+            <span className="text-right">Stock</span>
+            <span className="text-right">Current Price</span>
+            <span className="text-right">New Price</span>
+            <span className="text-center">Action</span>
+          </div>
+
+          {loading && products.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+            </div>
+          )}
+
+          {products.map(product => {
+            const edit = edits[product.id];
+            const hasEdit = edit?.price && parseFloat(edit.price) > 0;
+            const priceChanged = hasEdit && parseFloat(edit.price) * 100 !== product.unitPrice;
+
+            return (
+              <div key={product.id} className="grid items-center gap-2 px-4 py-3 border-b transition-colors hover:bg-[rgba(0,0,0,0.015)]"
+                style={{ borderColor: 'var(--surface-border)', gridTemplateColumns: '2fr 1fr 100px 140px 140px 100px' }}>
+                {/* Product */}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>{product.name}</p>
+                  {product.genericName && product.genericName !== product.name && (
+                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{product.genericName}</p>
+                  )}
+                </div>
+                {/* Barcode */}
+                <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{product.barcode || '—'}</span>
+                {/* Stock */}
+                <div className="text-right">
+                  <span className={`text-xs font-bold ${product.quantityOnHand <= 0 ? 'text-red-500' : 'text-teal-600'}`}>
+                    {product.quantityOnHand}
+                  </span>
+                  <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>{product.stockStatus}</span>
+                </div>
+                {/* Current Price */}
+                <span className="text-xs font-mono text-right" style={{ color: 'var(--text-secondary)' }}>{fmt(product.unitPrice)}</span>
+                {/* New Price Input */}
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={edit?.price ?? ''}
+                    onChange={e => onPriceChange(product.id, e.target.value)}
+                    placeholder={fmt(product.unitPrice)}
+                    className="w-full rounded-lg border px-2 py-1.5 text-xs font-mono text-right"
+                    style={{
+                      background: 'var(--surface-base)',
+                      borderColor: priceChanged ? 'rgba(13,148,136,0.5)' : 'var(--surface-border)',
+                      color: priceChanged ? '#0d9488' : 'var(--text-primary)',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={edit?.reason ?? ''}
+                    onChange={e => onReasonChange(product.id, e.target.value)}
+                    placeholder={globalReason || 'Reason...'}
+                    className="w-full rounded-lg border px-2 py-1 text-[10px]"
+                    style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-muted)' }}
+                  />
+                </div>
+                {/* Save button */}
+                <div className="flex justify-center">
+                  {hasEdit ? (
+                    <button
+                      onClick={() => {
+                        // Apply global reason if none provided
+                        if (globalReason && !edit?.reason) {
+                          onReasonChange(product.id, globalReason);
+                        }
+                        onSaveProduct(product.id, product.unitPrice);
+                      }}
+                      disabled={savingProductId === product.id}
+                      className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50 transition-all hover:scale-[1.02]"
+                      style={{ background: '#0d9488' }}
+                    >
+                      {savingProductId === product.id ? '...' : 'Save'}
+                    </button>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {products.length === 0 && !loading && (
+            <div className="p-12 text-center">
+              <Package className="mx-auto mb-3 h-8 w-8 opacity-20" />
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No products from this supplier</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {pendingCount > 0 ? `${pendingCount} price change${pendingCount !== 1 ? 's' : ''} pending` : 'No pending changes'}
+        </span>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <>
+              <button
+                onClick={onSaveAll}
+                disabled={loading}
+                className="rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                style={{ background: '#0d9488' }}
+              >
+                Save All Changes
+              </button>
+              <button
+                onClick={onExit}
+                className="rounded-lg px-3 py-2 text-xs font-semibold"
+                style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

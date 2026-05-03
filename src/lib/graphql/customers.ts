@@ -14,6 +14,7 @@ export const LIST_CUSTOMERS = gql`
       sex
       ageYears
       hasGhanaCard
+      notes
       createdAt
     }
   }
@@ -29,6 +30,7 @@ export const SEARCH_CUSTOMERS = gql`
       sex
       ageYears
       hasGhanaCard
+      notes
     }
   }
 `;
@@ -44,6 +46,7 @@ export const CREATE_CUSTOMER = gql`
       sex
       ageYears
       hasGhanaCard
+      notes
       createdAt
     }
   }
@@ -59,6 +62,7 @@ export const UPDATE_CUSTOMER = gql`
       sex
       ageYears
       hasGhanaCard
+      notes
       createdAt
     }
   }

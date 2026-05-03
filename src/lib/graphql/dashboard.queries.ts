@@ -97,6 +97,16 @@ export const GENERATE_STAFF_PASSWORD = gql`
   }
 `;
 
+export const SYNC_STAFF_SALES = gql`
+  mutation SyncStaffSales($input: SyncStaffSalesInput!) {
+    syncStaffSales(input: $input) {
+      assignedCount
+      totalChecked
+      message
+    }
+  }
+`;
+
 export const UPDATE_STAFF_PROFILE = gql`
   mutation UpdateStaffProfile($input: UpdateStaffProfileInput!) {
     updateStaffProfile(input: $input) {
