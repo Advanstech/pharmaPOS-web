@@ -1,8 +1,8 @@
-# PharmaPOS Web ↔ API team handoff
+# Azzay Pharmacy Web ↔ API team handoff
 
-This document summarizes what the **Next.js web app** (`PharmaPOS-web`) expects from the **GraphQL API** (e.g. Railway) so both sides stay aligned. Share this with backend engineers.
+This document summarizes what the **Next.js web app** (`Azzay Pharmacy-web`) expects from the **GraphQL API** (e.g. Railway) so both sides stay aligned. Share this with backend engineers.
 
-**Official product API reference (GraphQL surfaces, auth, AI, errors):** see [DEVELOPER_API_REFERENCE.md](./DEVELOPER_API_REFERENCE.md), including **PharmaPOS Web (this repo) — alignment** for how illustrative examples map to `src/lib/graphql/` operations.
+**Official product API reference (GraphQL surfaces, auth, AI, errors):** see [DEVELOPER_API_REFERENCE.md](./DEVELOPER_API_REFERENCE.md), including **Azzay Pharmacy Web (this repo) — alignment** for how illustrative examples map to `src/lib/graphql/` operations.
 
 ---
 
@@ -107,5 +107,5 @@ Used as implemented in `src/lib/graphql/dashboard.queries.ts` (invite, deactivat
 
 ## 6. Contact
 
-Frontend repo: **PharmaPOS-web** — GraphQL documents live under `src/lib/graphql/`.  
+Frontend repo: **Azzay Pharmacy-web** — GraphQL documents live under `src/lib/graphql/`.  
 Update this file when the API contract changes so both teams stay in sync.

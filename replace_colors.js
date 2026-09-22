@@ -42,4 +42,4 @@ function walk(dir) {
   }
 }
 
-walk('/Users/hanson/Code-Projects/Kirospace/PharmaPOS/apps/web/src/components');
+walk('/Users/hanson/Code-Projects/Kirospace/Azzay Pharmacy/apps/web/src/components');

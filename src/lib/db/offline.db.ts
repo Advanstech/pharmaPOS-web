@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { OfflineProduct, OfflineSale } from '@/types';
 
 /**
- * PharmaPOS offline IndexedDB via Dexie.js
+ * Azzay Pharmacy offline IndexedDB via Dexie.js
  * - products: cached catalogue (7-day TTL, warmed on login)
  * - pendingSales: queued transactions when offline (synced on reconnect)
  */
@@ -61,4 +61,14 @@ export async function getPendingSales(): Promise<OfflineSale[]> {
 /** Mark a sale as synced */
 export async function markSaleSynced(id: string): Promise<void> {
   await db.pendingSales.update(id, { synced: 1 });
+}
+
+/** Delete a specific pending sale by ID */
+export async function deletePendingSale(id: string): Promise<void> {
+  await db.pendingSales.delete(id);
+}
+
+/** Clear all pending sales (useful when stuck sales are causing sync errors) */
+export async function clearAllPendingSales(): Promise<void> {
+  await db.pendingSales.clear();
 }

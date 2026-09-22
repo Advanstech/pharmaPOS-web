@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useRef } from 'react';
 
 /**
- * Premium page transition for PharmaPOS dashboard.
+ * Premium page transition for Azzay Pharmacy dashboard.
  *
  * Behaviour:
  * - Navigating deeper (longer path): slide in from right
@@ -19,21 +19,21 @@ import { useRef } from 'react';
 const VARIANTS = {
   // Entering from the right (going deeper)
   enterRight: {
-    initial: { opacity: 0, x: 32, scale: 0.98, filter: 'blur(4px)' },
-    animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
-    exit: { opacity: 0, x: -24, scale: 0.98, filter: 'blur(2px)' },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
   },
   // Entering from the left (going back)
   enterLeft: {
-    initial: { opacity: 0, x: -32, scale: 0.98, filter: 'blur(4px)' },
-    animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
-    exit: { opacity: 0, x: 24, scale: 0.98, filter: 'blur(2px)' },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
   },
   // Same depth — crossfade with scale
   crossfade: {
-    initial: { opacity: 0, scale: 0.97, filter: 'blur(3px)' },
-    animate: { opacity: 1, scale: 1, filter: 'blur(0px)' },
-    exit: { opacity: 0, scale: 1.01, filter: 'blur(2px)' },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
   },
 };
 
@@ -82,7 +82,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
         animate={variant.animate}
         exit={variant.exit}
         transition={EASE_OUT}
-        style={{ minHeight: '100%', willChange: 'transform, opacity' }}
+        style={{ minHeight: '100%', willChange: 'opacity' }}
       >
         {children}
       </motion.div>

@@ -64,7 +64,7 @@ export function PharmaCopilot() {
       const greeting: Message = {
         id: 'greeting',
         role: 'assistant',
-        content: `Hello ${user?.name?.split(' ')[0] ?? 'there'}! 👋 I'm your PharmaPOS AI Copilot. I can help you with drug information, clinical guidance, inventory intelligence, and more. What would you like to know?`,
+        content: `Hello ${user?.name?.split(' ')[0] ?? 'there'}! 👋 I'm your Azzay Pharmacy AI Copilot. I can help you with drug information, clinical guidance, inventory intelligence, and more. What would you like to know?`,
         ts: Date.now(),
       };
       setMessages([greeting]);

@@ -15,6 +15,8 @@ export const SUPPLIER_RESTOCK_WATCH = gql`
     supplierRestockWatch {
       supplierId
       supplierName
+      supplierContactName
+      supplierAddress
       supplierPhone
       supplierEmail
       supplierAiScore
@@ -75,6 +77,7 @@ export const SUPPLIER_WITH_PRODUCTS_QUERY = gql`
         isActive
         quantityOnHand
         reorderLevel
+        nearestExpiry
         stockStatus
         sold7d
         sold30d
@@ -147,5 +150,11 @@ export const SUPPLIERS_LIST_ALL_QUERY = gql`
       isActive
       aiScore
     }
+  }
+`;
+
+export const BULK_REASSIGN_PRODUCTS_TO_SUPPLIER = gql`
+  mutation BulkReassignProductsToSupplier($productIds: [String!]!, $supplierId: String) {
+    bulkReassignProductsToSupplier(productIds: $productIds, supplierId: $supplierId)
   }
 `;

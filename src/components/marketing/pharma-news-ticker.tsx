@@ -103,7 +103,7 @@ export function PharmaNewsTicker() {
       )}
 
       <span className="sr-only">
-        Headlines refresh periodically from WHO and BBC Health RSS when available, plus PharmaPOS awareness tips.
+        Headlines refresh periodically from WHO and BBC Health RSS when available, plus Azzay Pharmacy awareness tips.
       </span>
     </div>
   );

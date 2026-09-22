@@ -63,7 +63,7 @@ export default function BillingPage() {
   ] as const : [];
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Billing</h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>Subscription · Usage · Invoices</p>

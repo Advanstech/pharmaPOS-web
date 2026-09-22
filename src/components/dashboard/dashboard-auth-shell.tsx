@@ -78,13 +78,13 @@ export function DashboardAuthShell({ children }: { children: React.ReactNode }) 
       style={{ background: 'var(--surface-base)' }}
     >
       <OfflineBanner />
+      {/* Mobile top bar sits above main content — only visible < md */}
+      <MobileTopBar />
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar: hidden on mobile, shown on md+ */}
         <div className="hidden md:flex">
           <Sidebar />
         </div>
-        {/* Mobile top bar */}
-        <MobileTopBar />
         <main
           ref={mainScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth"

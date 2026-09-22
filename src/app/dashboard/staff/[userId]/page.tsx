@@ -115,7 +115,7 @@ export default function StaffDetailPage() {
       <div className="mb-6 overflow-hidden rounded-2xl" style={{ background: 'linear-gradient(135deg, #004e57 0%, #006d77 50%, #0e7490 100%)', boxShadow: '0 4px 24px rgba(0,109,119,0.3)' }}>
         <div className="relative px-6 py-8">
           <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
-          <div className="relative z-10 flex items-center gap-5">
+          <div className="relative z-10 flex flex-wrap items-center gap-5">
             {/* Avatar */}
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold text-white"
               style={{ background: avatarGradient(member.name), border: '3px solid rgba(255,255,255,0.3)' }}>

@@ -77,15 +77,21 @@ export function SupplierFormModal({ supplier, open, onClose, onSuccess }: Suppli
     };
 
     try {
-      if (isEdit) {
+      if (isEdit && supplier) {
         await updateSupplier({ variables: { id: supplier.id, input } });
       } else {
         await createSupplier({ variables: { input } });
       }
       onSuccess?.();
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Operation failed');
+    } catch (e: any) {
+      console.error('Supplier save error:', e);
+      // Extract the actual error message from GraphQL errors
+      const errorMessage = e?.graphQLErrors?.[0]?.message ||
+                          e?.networkError?.message ||
+                          e?.message ||
+                          'Failed to save supplier. Please try again.';
+      setError(errorMessage);
     }
   };
 

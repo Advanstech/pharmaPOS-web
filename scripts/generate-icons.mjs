@@ -1,5 +1,5 @@
 /**
- * Generates PWA PNG icons for PharmaPOS Pro.
+ * Generates PWA PNG icons for Azzay Pharmacy Pro.
  * Pure Node.js — no native dependencies.
  * Run: node scripts/generate-icons.mjs
  * For crisp PNGs: pnpm add -D sharp && node scripts/generate-icons.mjs

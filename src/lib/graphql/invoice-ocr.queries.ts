@@ -59,31 +59,63 @@ export const GET_SUPPLIER_INVOICE = gql`
   query GetSupplierInvoice($id: ID!) {
     supplierInvoice(id: $id) {
       id
+      supplierId
       invoiceNumber
       invoiceDate
       dueDate
-      
+
+      totalAmountPesewas
       totalAmountFormatted
+      paidAmountPesewas
       paidAmountFormatted
+      balancePesewas
       balanceFormatted
-      
+      paymentProgressPct
+
       paymentTerms
       paymentStatus
-      
       daysOutstanding
       isOverdue
       overdueByDays
-      
+      suggestedNextPaymentPesewas
+      suggestedNextPaymentFormatted
+      remainingAfterSuggestedPesewas
+      remainingAfterSuggestedFormatted
+
       payments {
         id
+        amountPesewas
         amountFormatted
         paymentMethod
         reference
+        notes
         paidByName
         paidAt
       }
-      
+
       supplierName
+      grnId
+      s3PdfKey
+      extractedDataJson
+    }
+  }
+`;
+
+export const GET_INVOICE_LINE_ITEMS = gql`
+  query InvoiceLineItems($invoiceId: ID!) {
+    invoiceLineItems(invoiceId: $invoiceId) {
+      id
+      productId
+      productName
+      genericName
+      quantity
+      unitCostPesewas
+      unitCostFormatted
+      lineTotalPesewas
+      lineTotalFormatted
+      batchNumber
+      expiryDate
+      imageUrl
     }
   }
 `;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import { ArrowLeft, CheckCircle, XCircle, Loader2, AlertTriangle, Search } from 'lucide-react';
@@ -82,16 +82,18 @@ export default function OcrReviewPage() {
     variables: { id: jobId },
     pollInterval: 2000,
     fetchPolicy: 'network-only',
-    onCompleted: (d) => {
-      if (d?.invoiceOcrJob?.status === 'completed') {
-        const loadedItems = d.invoiceOcrJob.extractedData?.items || [];
-        triggerAutoSearch(loadedItems);
-      }
-    },
   });
 
   const job = data?.invoiceOcrJob;
   const ed = job?.extractedData;
+
+  // Trigger auto-search once when job completes
+  useEffect(() => {
+    if (job?.status === 'completed') {
+      const loadedItems = ed?.items || [];
+      triggerAutoSearch(loadedItems);
+    }
+  }, [job?.status, ed?.items, triggerAutoSearch]);
 
   // Derive values — use overrides if set, otherwise use extracted data
   const invoiceNumber = overrides.invoiceNumber ?? ed?.invoiceNumber ?? '';
@@ -115,30 +117,34 @@ export default function OcrReviewPage() {
   }, [overrides.items, ed?.items]);
 
   const matchedCount = items.filter(i => i.selectedProductId).length;
+  const unmatchedCount = items.length - matchedCount;
   const hasMissingBatchOrExpiry = items
     .filter(i => i.selectedProductId)
     .some(i => !i.batchNumber || !i.expiryDate);
 
-  // Allow confirm as long as invoice number + date are filled
-  // Products don't need to be matched — unmatched items are noted for manual entry
+  // Require at least one matched product, invoice number, date, and batch/expiry on matched items
   const isConfirmDisabled =
-    confirming || !invoiceNumber.trim() || !invoiceDate || hasMissingBatchOrExpiry;
+    confirming || !invoiceNumber.trim() || !invoiceDate || hasMissingBatchOrExpiry || matchedCount === 0;
 
   const handleConfirm = async () => {
     if (!job) return;
     setConfirming(true);
     try {
-      // Include ALL items — matched and unmatched
-      const lines = items.map(i => ({
-        productId: i.selectedProductId || '',
-        productName: i.selectedProductName || i.description,
-        quantity: Math.max(1, Number(i.quantity) || 1),
-        unitCostPesewas: Math.max(1, Number(i.unitPrice) || 0),
-        batchNumber: i.batchNumber || '',
-        expiryDate: i.expiryDate || '',
-        ocrDescription: i.description,
-        matched: !!i.selectedProductId,
-      }));
+      // Only include items that have been matched to a product
+      const matchedLines = items
+        .filter(i => i.selectedProductId)
+        .map(i => ({
+          productId: i.selectedProductId!,
+          productName: i.selectedProductName || i.description,
+          quantity: Math.max(1, Number(i.quantity) || 1),
+          unitCostPesewas: Math.max(1, Number(i.unitPrice) || 0),
+          batchNumber: i.batchNumber || '',
+          expiryDate: i.expiryDate || '',
+          ocrDescription: i.description,
+          matched: true,
+        }));
+
+      const unmatchedCount = items.length - matchedLines.length;
 
       const payload = {
         source: 'ocr',
@@ -148,8 +154,10 @@ export default function OcrReviewPage() {
         invoiceNumber: invoiceNumber.trim(),
         invoiceDate,
         dueDate: dueDate || '',
-        notes: `Prefilled from OCR job ${jobId}`,
-        lines,
+        notes: unmatchedCount > 0
+          ? `OCR job ${jobId}. Note: ${unmatchedCount} item(s) not matched and excluded — add manually.`
+          : `Prefilled from OCR job ${jobId}`,
+        lines: matchedLines,
       };
 
       sessionStorage.setItem('receiveStockPrefill', JSON.stringify(payload));
@@ -226,7 +234,7 @@ export default function OcrReviewPage() {
   // ── Completed ────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6">
         <Link href="/dashboard/invoices/upload" className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Upload
@@ -433,16 +441,18 @@ export default function OcrReviewPage() {
             <div className="space-y-2 text-sm">
               {[
                 ['Total Items', items.length],
-                ['Matched Products', matchedCount],
+                ['Matched to Products', `${matchedCount} / ${items.length}`],
+                ['Unmatched (excluded)', unmatchedCount],
                 ['Overall Confidence', `${job.confidenceScore ?? ed?.confidence ?? 0}%`],
-                ['Requires Review', job.requiresReview ? 'Yes' : 'No'],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex justify-between">
                   <span className="text-content-secondary">{label}</span>
                   <span className={`font-semibold ${
                     label === 'Overall Confidence'
                       ? Number(String(value).replace('%','')) > 90 ? 'text-green-600' : 'text-amber-600'
-                      : 'text-content-primary'
+                      : label === 'Unmatched (excluded)' && Number(value) > 0
+                        ? 'text-amber-600'
+                        : 'text-content-primary'
                   }`}>{value}</span>
                 </div>
               ))}
@@ -456,13 +466,27 @@ export default function OcrReviewPage() {
             </div>
           )}
 
+          {matchedCount === 0 && !hasMissingBatchOrExpiry && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              Match at least one item to a product before confirming.
+            </div>
+          )}
+
+          {unmatchedCount > 0 && matchedCount > 0 && !hasMissingBatchOrExpiry && (
+            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {unmatchedCount} unmatched item(s) will be excluded. Add them manually in the receive form.
+            </div>
+          )}
+
           <div className="rounded-xl border border-teal/40 bg-teal/5 p-4">
             <div className="flex items-start gap-2">
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-teal" />
               <div>
                 <p className="text-sm font-semibold text-content-primary">Ready to Confirm</p>
                 <p className="mt-0.5 text-xs text-content-secondary">
-                  Review data, then send matched items to Receive Stock form.
+                  {matchedCount} matched product(s) will prefill the Receive Stock form.
                 </p>
               </div>
             </div>
@@ -474,7 +498,7 @@ export default function OcrReviewPage() {
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Preparing...
               </span>
-            ) : 'Use in Receive Stock (Manual)'}
+            ) : `Send ${matchedCount} Product(s) to Receive Stock`}
           </button>
 
           <Link href="/dashboard/invoices/upload"

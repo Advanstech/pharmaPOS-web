@@ -11,7 +11,7 @@ import { ToastProvider, ConfirmProvider, PromptProvider } from '@/components/ui/
 
 const THEME_INIT = `(function(){
   try {
-    var raw = localStorage.getItem('pharmapos-theme');
+    var raw = localStorage.getItem('azzay-pharmacy-theme');
     var theme = 'system';
     if (raw) {
       var p = JSON.parse(raw);
@@ -19,7 +19,7 @@ const THEME_INIT = `(function(){
     }
     var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', dark);
-    var zRaw = localStorage.getItem('pharmapos-zoom');
+    var zRaw = localStorage.getItem('azzay-pharmacy-zoom');
     if (zRaw) {
       var z = JSON.parse(zRaw);
       if (z && z.state && z.state.zoom && z.state.zoom !== '100') {
@@ -105,22 +105,22 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_GH',
-    siteName: 'PharmaPOS Pro',
-    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    siteName: 'Azzay Pharmacy Pro',
+    title: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
     description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     url: '/',
-    images: [{ url: '/icon.png', width: 512, height: 512, alt: 'PharmaPOS logo' }],
+    images: [{ url: '/icon.png', width: 512, height: 512, alt: 'Azzay Pharmacy logo' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
+    title: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
     description: 'Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
     images: ['/icon.png'],
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'PharmaPOS',
+    title: 'Azzay Pharmacy',
   },
   formatDetection: {
     telephone: false,
@@ -133,8 +133,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#006D77' },
-    { media: '(prefers-color-scheme: dark)', color: '#004D55' },
+    { media: '(prefers-color-scheme: light)', color: '#064E3B' },
+    { media: '(prefers-color-scheme: dark)', color: '#06392F' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -163,7 +163,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         {/* Inline critical theme script to prevent flash */}
-        <Script id="pharmapos-theme-init" strategy="beforeInteractive">
+        <Script id="azzay-pharmacy-theme-init" strategy="beforeInteractive">
           {THEME_INIT}
         </Script>
         

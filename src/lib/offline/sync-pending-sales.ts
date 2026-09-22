@@ -2,7 +2,7 @@ import type { ApolloClient } from '@apollo/client';
 import { CREATE_SALE } from '@/lib/graphql/sales.mutations';
 import { DAILY_SUMMARY, RECENT_SALES } from '@/lib/graphql/sales.queries';
 import { buildCreateSaleInput } from '@/lib/sales/build-create-sale-input';
-import { getPendingSales, markSaleSynced } from '@/lib/db/offline.db';
+import { getPendingSales, markSaleSynced, deletePendingSale } from '@/lib/db/offline.db';
 import type { PaymentMethod } from '@/types';
 
 function tenderToApiMethod(m: PaymentMethod): 'CASH' | 'MTN_MOMO' {
@@ -40,9 +40,26 @@ export async function syncPendingSales(client: ApolloClient): Promise<number> {
       });
       await markSaleSynced(sale.id);
       synced += 1;
-    } catch (e) {
+      console.info('[syncPendingSales] successfully synced', sale.id);
+    } catch (e: any) {
       console.error('[syncPendingSales] failed for', sale.id, e);
-      break;
+      
+      // If it's a network error, stop trying others
+      if (e.networkError || (e.message && e.message.toLowerCase().includes('network'))) {
+        console.warn('[syncPendingSales] network error detected, stopping sync loop');
+        break;
+      }
+      
+      // If it's a GraphQL/Validation error (400), it's likely a "poison pill" 
+      // (e.g. product deleted, schema mismatch). Delete it to stop retrying.
+      const isBadRequest = e.networkError?.statusCode === 400 || 
+        (e.message && e.message.includes('400'));
+      if (isBadRequest) {
+        console.warn('[syncPendingSales] deleting bad sale', sale.id, '- will not retry');
+        await deletePendingSale(sale.id);
+      }
+      
+      continue;
     }
   }
   return synced;

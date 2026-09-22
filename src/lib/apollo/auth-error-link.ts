@@ -9,9 +9,11 @@ let refreshInFlight: Promise<void> | null = null;
 
 async function refreshAccessToken(): Promise<boolean> {
   try {
-    const { refreshToken, setAccessToken, clearAuth } = useAuthStore.getState();
+    const { hasHydrated, refreshToken, setAccessToken, clearAuth } = useAuthStore.getState();
     if (!refreshToken) {
-      clearAuth();
+      if (hasHydrated) {
+        clearAuth();
+      }
       return false;
     }
     const res = await fetch(getGraphqlHttpUri(), {

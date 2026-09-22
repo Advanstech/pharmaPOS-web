@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertTriangle, ChevronRight, Package, Plus, Truck } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Package, Plus, Truck, Pencil, TrendingDown, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -16,6 +16,7 @@ import { CREATE_PRODUCT_MUTATION } from '@/lib/graphql/products.queries';
 import { SUPPLIERS_LIST_QUERY } from '@/lib/graphql/suppliers.queries';
 import { Pagination } from '@/components/ui/pagination';
 import { canCreateProduct } from '@/lib/auth/inventory-access';
+import { ProductEditModal } from '@/components/inventory/product-edit-modal';
 
 type StockStatus = 'critical' | 'low' | 'ok' | 'out';
 
@@ -27,7 +28,10 @@ type InventoryRow = {
   reorderLevel: number;
   stockStatus: StockStatus;
   nearestExpiry?: string | null;
+  supplierId?: string | null;
   supplierName?: string | null;
+  unitPricePesewas?: number | null;
+  unitPriceFormatted?: string | null;
 };
 
 type CreateProductMutationResult = {
@@ -47,6 +51,7 @@ type CreateProductMutationVariables = {
     branchType: 'pharmaceutical' | 'chemical' | 'both';
     reorderLevel?: number;
     supplierId?: string;
+    costPrice?: number;
   };
 };
 
@@ -57,10 +62,10 @@ type SupplierOption = {
 };
 
 const STATUS_STYLES: Record<StockStatus, CSSProperties> = {
-  critical: { background: 'rgba(220,38,38,0.1)', color: '#b91c1c' },
-  low: { background: 'rgba(217,119,6,0.1)', color: '#92400e' },
-  ok: { background: 'rgba(22,163,74,0.1)', color: '#15803d' },
-  out: { background: 'rgba(127,29,29,0.12)', color: '#7f1d1d' },
+  critical: { background: 'var(--stock-pill-critical-bg)', color: 'var(--stock-pill-critical-fg)' },
+  low: { background: 'var(--stock-pill-low-bg)', color: 'var(--stock-pill-low-fg)' },
+  ok: { background: 'var(--stock-pill-ok-bg)', color: 'var(--stock-pill-ok-fg)' },
+  out: { background: 'var(--stock-pill-out-bg)', color: 'var(--stock-pill-out-fg)' },
 };
 
 const STATUS_LABELS: Record<StockStatus, string> = {
@@ -93,6 +98,8 @@ export default function InventoryPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<InventoryRow | null>(null);
+  const canManageProducts = user ? ['owner', 'se_admin', 'manager', 'head_pharmacist'].includes(user.role) : false;
   const itemsPerPage = 10;
   const canCreateProducts = user ? canCreateProduct(user.role) : false;
   const canViewLowStockAlerts = user
@@ -103,7 +110,7 @@ export default function InventoryPage() {
     CreateProductMutationResult,
     CreateProductMutationVariables
   >(CREATE_PRODUCT_MUTATION, {
-    refetchQueries: [{ query: INVENTORY_LIST_QUERY }, { query: LOW_STOCK_ALERTS_QUERY }],
+    refetchQueries: [{ query: INVENTORY_LIST_QUERY }, { query: LOW_STOCK_ALERTS_QUERY }, { query: SUPPLIERS_LIST_QUERY }],
     awaitRefetchQueries: true,
   });
 
@@ -111,7 +118,7 @@ export default function InventoryPage() {
     pollInterval: 5000,
     fetchPolicy: 'cache-and-network',
   });
-  const { data: suppliersData, loading: suppliersLoading } = useQuery<{ suppliers: SupplierOption[] }>(SUPPLIERS_LIST_QUERY, {
+  const { data: suppliersData, loading: suppliersLoading, refetch: refetchSuppliers } = useQuery<{ suppliers: SupplierOption[] }>(SUPPLIERS_LIST_QUERY, {
     skip: !canCreateProducts,
     fetchPolicy: 'cache-and-network',
   });
@@ -123,7 +130,22 @@ export default function InventoryPage() {
 
   const today = new Date();
   const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  // Refetch suppliers when create modal opens to ensure new suppliers appear
+  useEffect(() => {
+    if (showCreateModal && canCreateProducts) {
+      refetchSuppliers();
+    }
+  }, [showCreateModal, canCreateProducts, refetchSuppliers]);
+
   const inventory = inventoryData?.inventory ?? [];
+
+  /* ── Aggregate stats ── */
+  const totalValuePesewas = useMemo(() =>
+    inventory.reduce((acc, i) => acc + (i.unitPricePesewas ?? 0) * i.quantityOnHand, 0),
+    [inventory],
+  );
+  const totalValueGhs = (totalValuePesewas / 100).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeSuppliers = useMemo(
     () => (suppliersData?.suppliers ?? []).filter((supplier) => supplier.isActive),
     [suppliersData?.suppliers],
@@ -176,37 +198,72 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Inventory</h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {loading ? 'Syncing stock intelligence...' : `${inventory.length} products tracked — open a row to receive, adjust, and view movement history`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {canCreateProducts && (
-            <Link
-              href="/dashboard/inventory/receive"
-              className="inline-flex items-center gap-2 rounded-lg border border-teal px-4 py-2 text-sm font-semibold text-teal hover:bg-teal/5 transition-colors"
-            >
-              <Truck size={15} />
-              Receive stock
-            </Link>
-          )}
-          {canCreateProducts && (
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: 'var(--color-teal)' }}
-            >
-              <Plus size={15} />
-              Add product
-            </button>
-          )}
+    <div style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      {/* ── Hero stats bar ── */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(13,148,136,0.07) 0%,rgba(0,109,119,0.03) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
+        <div className="mx-auto max-w-[1400px] px-4 pb-5 pt-6 md:px-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Inventory</h1>
+              <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+                {loading ? 'Syncing stock intelligence…' : `${inventory.length} products tracked — open a row to receive, adjust, and view movement history`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canCreateProducts && (
+                <Link
+                  href="/dashboard/inventory/receive"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105"
+                  style={{ color: 'var(--color-teal)', background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.25)' }}
+                >
+                  <Truck size={15} />
+                  Receive Stock
+                </Link>
+              )}
+              {canCreateProducts && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                  style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0f766e 100%)', boxShadow: '0 4px 14px rgba(13,148,136,0.35)' }}
+                >
+                  <Plus size={15} />
+                  Add Product
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Total SKUs', value: inventory.length.toString(), icon: <Package size={16} />, accent: 'teal' as const },
+              { label: 'Stock Value', value: `GH₵ ${totalValueGhs}`, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>, accent: 'teal' as const },
+              { label: 'Low / Critical', value: lowCount.toString(), icon: <TrendingDown size={16} />, accent: lowCount > 0 ? 'amber' as const : 'teal' as const, glow: lowCount > 0 },
+              { label: 'Expiring Soon', value: expiringCount.toString(), icon: <Clock size={16} />, accent: expiringCount > 0 ? 'red' as const : 'teal' as const, glow: expiringCount > 0 },
+            ].map(({ label, value, icon, accent, glow }) => {
+              const a = accent === 'amber'
+                ? { border: 'rgba(217,119,6,0.3)', bg: 'rgba(217,119,6,0.06)', iconBg: 'rgba(217,119,6,0.12)', iconColor: '#d97706', valueColor: '#92400e', glowShadow: '0 0 20px rgba(217,119,6,0.2)' }
+                : accent === 'red'
+                  ? { border: 'rgba(220,38,38,0.3)', bg: 'rgba(220,38,38,0.06)', iconBg: 'rgba(220,38,38,0.12)', iconColor: '#dc2626', valueColor: '#991b1b', glowShadow: '0 0 20px rgba(220,38,38,0.2)' }
+                  : { border: 'rgba(13,148,136,0.2)', bg: 'rgba(13,148,136,0.06)', iconBg: 'rgba(13,148,136,0.12)', iconColor: '#0d9488', valueColor: 'var(--text-primary)', glowShadow: '0 0 20px rgba(13,148,136,0.15)' };
+              return (
+                <div key={label} className="relative overflow-hidden rounded-2xl p-4" style={{ border: `1px solid ${a.border}`, background: a.bg, boxShadow: glow ? a.glowShadow : '0 2px 12px rgba(0,0,0,0.04)' }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                      <p className="mt-1.5 font-mono text-xl font-bold leading-none tracking-tight" style={{ color: a.valueColor }}>{value}</p>
+                    </div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: a.iconBg, color: a.iconColor }}>{icon}</div>
+                  </div>
+                  {glow && <div className="pointer-events-none absolute -inset-px animate-pulse rounded-2xl opacity-30" style={{ border: `1px solid ${a.iconColor}` }} />}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      <div className="mx-auto max-w-[1400px] p-4 md:px-6 md:pt-5">
 
       {user && (
         <div className="mb-6">
@@ -312,7 +369,7 @@ export default function InventoryPage() {
               <th className="px-4 py-3 hidden md:table-cell">Expiry</th>
               <th className="px-4 py-3 hidden lg:table-cell">Supplier</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 w-28 text-right">Detail</th>
+              <th className="px-4 py-3 text-right">{canManageProducts ? 'Actions' : 'Detail'}</th>
             </tr>
           </thead>
           <tbody>
@@ -383,17 +440,27 @@ export default function InventoryPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        href={
-                          fromInvoiceImport
-                            ? `/dashboard/inventory/${item.productId}?source=invoice-import&focus=receive`
-                            : `/dashboard/inventory/${item.productId}`
-                        }
-                        className="inline-flex items-center gap-0.5 text-xs font-bold text-[var(--color-teal)] hover:underline"
-                      >
-                        Stock
-                        <ChevronRight size={14} aria-hidden />
-                      </Link>
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        {canManageProducts && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingProduct(item)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold transition-all duration-150 hover:scale-105"
+                            style={{ background: 'rgba(13,148,136,0.08)', color: 'var(--color-teal)', border: '1px solid rgba(13,148,136,0.2)' }}
+                            title="Edit product"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                        )}
+                        <Link
+                          href={fromInvoiceImport ? `/dashboard/inventory/${item.productId}?source=invoice-import&focus=receive` : `/dashboard/inventory/${item.productId}`}
+                          className="inline-flex items-center gap-0.5 text-xs font-bold text-[var(--color-teal)] hover:underline"
+                        >
+                          Stock
+                          <ChevronRight size={14} aria-hidden />
+                        </Link>
+                      </div>
                     </td>
                   </motion.tr>
                 );
@@ -419,6 +486,7 @@ export default function InventoryPage() {
           />
         )}
       </div>
+      </div>
 
       <AnimatePresence>
         {showCreateModal && (
@@ -432,6 +500,17 @@ export default function InventoryPage() {
           />
         )}
       </AnimatePresence>
+
+      {editingProduct && (
+        <ProductEditModal
+          product={editingProduct}
+          unitPrice={editingProduct.unitPricePesewas ?? undefined}
+          nearestExpiry={editingProduct.nearestExpiry}
+          open={Boolean(editingProduct)}
+          onClose={() => setEditingProduct(null)}
+          onSuccess={() => setEditingProduct(null)}
+        />
+      )}
     </div>
   );
 }
@@ -451,6 +530,7 @@ function CreateProductModal({ loading, submitError, suppliers, suppliersLoading,
   const [barcode, setBarcode] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [unitPriceGhs, setUnitPriceGhs] = useState('');
+  const [costPriceGhs, setCostPriceGhs] = useState('');
   const [classification, setClassification] = useState<'OTC' | 'POM' | 'CONTROLLED'>('OTC');
   const [branchType, setBranchType] = useState<'pharmaceutical' | 'chemical' | 'both'>('both');
   const [reorderLevel, setReorderLevel] = useState('10');
@@ -468,6 +548,12 @@ function CreateProductModal({ loading, submitError, suppliers, suppliersLoading,
     const price = Number(unitPriceGhs);
     if (!Number.isFinite(price) || price < 0) {
       setLocalError('Enter a valid selling price in GHS.');
+      return;
+    }
+
+    const cost = costPriceGhs.trim() ? Number(costPriceGhs) : null;
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      setLocalError('Enter a valid cost price in GHS.');
       return;
     }
 
@@ -492,6 +578,7 @@ function CreateProductModal({ loading, submitError, suppliers, suppliersLoading,
       genericName: genericName.trim() || undefined,
       barcode: barcode.trim() || undefined,
       unitPrice: Math.round(price * 100),
+      costPrice: cost !== null ? Math.round(cost * 100) : undefined,
       classification,
       branchType,
       reorderLevel: Math.round(reorder),
@@ -584,6 +671,20 @@ function CreateProductModal({ loading, submitError, suppliers, suppliersLoading,
               className="mt-1 w-full rounded-lg px-3 py-2 text-sm outline-none"
               style={{ border: '1px solid var(--surface-border)', color: 'var(--text-primary)', background: 'var(--surface-base)' }}
               placeholder="EAN-13"
+            />
+          </label>
+
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Cost price (GHS)
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={costPriceGhs}
+              onChange={(e) => setCostPriceGhs(e.target.value)}
+              className="mt-1 w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{ border: '1px solid var(--surface-border)', color: 'var(--text-primary)', background: 'var(--surface-base)' }}
+              placeholder="10.00"
             />
           </label>
 

@@ -1,20 +1,20 @@
-# PharmaPOS Pro — Developer API Reference
+# Azzay Pharmacy Pro — Developer API Reference
 
-Welcome to the **PharmaPOS Pro API**. We are redefining pharmaceutical retail infrastructure by combining a lightning-fast GraphQL core with native AI capabilities, including a Virtual CFO, Internal Auditor, and clinical intelligence.
+Welcome to the **Azzay Pharmacy Pro API**. We are redefining pharmaceutical retail infrastructure by combining a lightning-fast GraphQL core with native AI capabilities, including a Virtual CFO, Internal Auditor, and clinical intelligence.
 
 This document serves as the primary integration guide for external developers, partners, and integrators.
 
-For **this repository** (PharmaPOS Web on Next.js), HTTP routing, environment variables, and CORS/proxy behavior are documented in [`API_TEAM_HANDOFF.md`](./API_TEAM_HANDOFF.md). GraphQL operations used by the app live under `src/lib/graphql/`.
+For **this repository** (Azzay Pharmacy Web on Next.js), HTTP routing, environment variables, and CORS/proxy behavior are documented in [`API_TEAM_HANDOFF.md`](./API_TEAM_HANDOFF.md). GraphQL operations used by the app live under `src/lib/graphql/`.
 
 ---
 
 ## 🏗 Architecture Overview
 
-PharmaPOS Pro is built on a modern, code-first **GraphQL** architecture. We expose a single, unified graph for all business operations, ensuring clients only fetch exactly the data they need.
+Azzay Pharmacy Pro is built on a modern, code-first **GraphQL** architecture. We expose a single, unified graph for all business operations, ensuring clients only fetch exactly the data they need.
 
 ```mermaid
 graph TD;
-    Client[External Client / POS App] -->|HTTP POST /graphql| API[PharmaPOS API Gateway]
+    Client[External Client / POS App] -->|HTTP POST /graphql| API[Azzay Pharmacy API Gateway]
     Client -->|WebSocket /graphql| API
     
     API --> Auth[Auth & RBAC Layer]
@@ -37,7 +37,7 @@ graph TD;
 
 ---
 
-## ✅ PharmaPOS Web (this repo) — alignment
+## ✅ Azzay Pharmacy Web (this repo) — alignment
 
 The web app uses the same GraphQL schema as external clients, with these integration details:
 
@@ -131,7 +131,7 @@ mutation Login($email: String!, $password: String!) {
 
 ## 🧠 AI & Intelligence Endpoints
 
-PharmaPOS Pro is the first POS to include built-in AI agents. These are accessible via standard GraphQL queries.
+Azzay Pharmacy Pro is the first POS to include built-in AI agents. These are accessible via standard GraphQL queries.
 
 ### 1. Virtual CFO (query field `cfoBriefing`)
 
@@ -163,7 +163,7 @@ query GetCfoBriefing {
 
 Subfields under `workingCapital` / `investmentIntelligence` are **examples**; names and shapes vary by schema version — confirm in GraphQL Playground.
 
-**PharmaPOS Web:** The deployed app uses a broader selection (e.g. `branchName`, `generatedAt`, `alerts`, `keyRatios`, `revenueIntelligence`, `monthRevenuePesewas`, detailed `workingCapital` pesewas/formatted fields, and richer `investmentIntelligence.recommendations`). See `CFO_BRIEFING` in `src/lib/graphql/accounting.queries.ts`. The schema may also expose `overallHealthScore` or `monthNetProfitFormatted`; request them in GraphQL Playground if your schema includes them.
+**Azzay Pharmacy Web:** The deployed app uses a broader selection (e.g. `branchName`, `generatedAt`, `alerts`, `keyRatios`, `revenueIntelligence`, `monthRevenuePesewas`, detailed `workingCapital` pesewas/formatted fields, and richer `investmentIntelligence.recommendations`). See `CFO_BRIEFING` in `src/lib/graphql/accounting.queries.ts`. The schema may also expose `overallHealthScore` or `monthNetProfitFormatted`; request them in GraphQL Playground if your schema includes them.
 
 ### 2. Internal Auditor (query field `internalAuditReport`)
 
@@ -192,7 +192,7 @@ query InternalAuditReport($input: AuditPeriodInput!) {
 
 Variables: `{ "input": { "periodStart": "2026-01-01", "periodEnd": "2026-01-31" } }`.
 
-**PharmaPOS Web:** Full audit shape with `FINDING_FRAGMENT`, nested `findings`, `inventoryIntegrity`, `taxCompliance`, `licenceCompliance`, `staffProfiles`, etc. — see `INTERNAL_AUDIT_REPORT` in `src/lib/graphql/audit.queries.ts`. Older sketches sometimes used `executiveSummary` or counters named `pomViolationsCount`; the integrated client uses the fields above.
+**Azzay Pharmacy Web:** Full audit shape with `FINDING_FRAGMENT`, nested `findings`, `inventoryIntegrity`, `taxCompliance`, `licenceCompliance`, `staffProfiles`, etc. — see `INTERNAL_AUDIT_REPORT` in `src/lib/graphql/audit.queries.ts`. Older sketches sometimes used `executiveSummary` or counters named `pomViolationsCount`; the integrated client uses the fields above.
 
 ### 3. Clinical Intelligence
 
@@ -222,7 +222,7 @@ mutation CreateSale($input: CreateSaleInput!) {
 }
 ```
 
-**PharmaPOS Web:** Matches `CREATE_SALE` in `src/lib/graphql/sales.mutations.ts` (also requests `vatPesewas`, `soldAt`, `idempotencyKey`, per-item `reorderLevel`, `stockStatus`). If your schema exposes `totalAmountFormatted` or line-level `unitPriceFormatted`, add them to your selection set as needed.
+**Azzay Pharmacy Web:** Matches `CREATE_SALE` in `src/lib/graphql/sales.mutations.ts` (also requests `vatPesewas`, `soldAt`, `idempotencyKey`, per-item `reorderLevel`, `stockStatus`). If your schema exposes `totalAmountFormatted` or line-level `unitPriceFormatted`, add them to your selection set as needed.
 
 ### Inventory Management
 
@@ -246,7 +246,7 @@ query InventoryList {
 }
 ```
 
-**PharmaPOS Web:** Uses `INVENTORY_LIST_QUERY` in `src/lib/graphql/inventory.queries.ts` (no `branchId` argument). Some integrations or admin tools may instead use `inventory(branchId: $branchId)` with batches/expiry detail — confirm the argument and nested types in your schema.
+**Azzay Pharmacy Web:** Uses `INVENTORY_LIST_QUERY` in `src/lib/graphql/inventory.queries.ts` (no `branchId` argument). Some integrations or admin tools may instead use `inventory(branchId: $branchId)` with batches/expiry detail — confirm the argument and nested types in your schema.
 
 ```graphql
 query GetInventory($branchId: String!) {
@@ -270,7 +270,7 @@ query GetInventory($branchId: String!) {
 
 To listen for live events (e.g., a new prescription arriving from a doctor), connect via WebSockets using the `graphql-ws` protocol.
 
-- **URL:** `wss://api.pharmapos.com/graphql`
+- **URL:** `wss://api.azzaypharmacy.com/graphql`
 - **Auth:** Send the JWT in the `connectionParams` during the initial handshake:
 
   ```json
@@ -283,7 +283,7 @@ To listen for live events (e.g., a new prescription arriving from a doctor), con
 
 ## 🚨 Error Handling
 
-PharmaPOS Pro uses standard GraphQL error formatting, enriched with custom extension codes for programmatic handling.
+Azzay Pharmacy Pro uses standard GraphQL error formatting, enriched with custom extension codes for programmatic handling.
 
 ```json
 {
@@ -300,7 +300,7 @@ PharmaPOS Pro uses standard GraphQL error formatting, enriched with custom exten
 }
 ```
 
-**PharmaPOS Web:** UI helpers prefer `errors[0].message` (and network body errors when present) — see `src/lib/apollo/format-apollo-error.ts`. You can additionally read `errors[0].extensions?.code` for branching logic.
+**Azzay Pharmacy Web:** UI helpers prefer `errors[0].message` (and network body errors when present) — see `src/lib/apollo/format-apollo-error.ts`. You can additionally read `errors[0].extensions?.code` for branching logic.
 
 **Common Error Codes:**
 
@@ -314,7 +314,7 @@ PharmaPOS Pro uses standard GraphQL error formatting, enriched with custom exten
 
 ## 🏥 Compliance & Regulatory
 
-PharmaPOS Pro enforces strict regulatory compliance at the API level. External clients **cannot** bypass these rules:
+Azzay Pharmacy Pro enforces strict regulatory compliance at the API level. External clients **cannot** bypass these rules:
 
 - **POM Enforcement:** Prescription-Only Medicines cannot be checked out without a linked, verified `prescription_id`.
 - **Chemical Shop Isolation:** Branches designated as "chemical shops" are hard-blocked from accessing or selling POMs.

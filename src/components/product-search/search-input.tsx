@@ -27,14 +27,14 @@ export function SearchInput({ value, onChange, loading, isBarcodeScan }: SearchI
               initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.7, opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <ScanBarcode size={18} className="text-[var(--color-teal)]" aria-hidden="true" />
+              <ScanBarcode size={22} className="text-[var(--color-teal)]" aria-hidden="true" />
             </motion.div>
           ) : (
             <motion.div key="search"
               initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.7, opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <Search size={18} className="text-[var(--text-muted)] group-focus-within:text-[var(--color-teal)] transition-colors" aria-hidden="true" />
+              <Search size={22} className="text-[var(--text-muted)] group-focus-within:text-[var(--color-teal)] transition-colors" aria-hidden="true" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -52,7 +52,7 @@ export function SearchInput({ value, onChange, loading, isBarcodeScan }: SearchI
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
-        className="w-full h-12 pl-11 pr-11 text-sm rounded-xl border transition-all duration-200 focus:outline-none"
+        className="w-full h-14 pl-12 pr-12 text-base rounded-2xl border transition-all duration-200 focus:outline-none"
         style={{
           background: 'var(--surface-card)',
           color: 'var(--text-primary)',
@@ -85,10 +85,10 @@ export function SearchInput({ value, onChange, loading, isBarcodeScan }: SearchI
                 onChange('');
                 inputRef.current?.focus();
               }}
-              className="pointer-events-auto flex size-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+              className="pointer-events-auto flex size-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
               aria-label="Clear search"
             >
-              <X size={14} strokeWidth={2} className="block shrink-0 text-[var(--text-muted)]" aria-hidden />
+              <X size={18} strokeWidth={2} className="block shrink-0 text-[var(--text-muted)]" aria-hidden />
             </motion.button>
           ) : null}
         </AnimatePresence>

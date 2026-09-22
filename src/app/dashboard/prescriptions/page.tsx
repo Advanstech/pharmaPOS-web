@@ -108,7 +108,7 @@ export default function PrescriptionsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <motion.div
         className="mb-6"
         initial={shouldReduceMotion ? false : { opacity: 0, y: -8 }}

@@ -59,7 +59,7 @@ export default function ExpenseApprovalPage() {
 
   if (error || !expense) {
     return (
-      <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
         <div className="mx-auto max-w-2xl rounded-lg border border-red-500/50 bg-red-500/10 p-6">
           <XCircle className="mb-4 h-12 w-12 text-red-500" />
           <h2 className="text-xl font-bold text-red-500">Error loading expense</h2>
@@ -75,7 +75,7 @@ export default function ExpenseApprovalPage() {
   }
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <div className="mb-6">
         <Link
           href="/dashboard/expenses"

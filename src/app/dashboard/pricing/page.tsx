@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import {
   DollarSign, History, TrendingUp, TrendingDown, Search, ArrowLeft,
-  AlertTriangle, CheckCircle, Percent, Tag, ArrowRight,
+  AlertTriangle, CheckCircle, Percent, Tag, ArrowRight, Filter, X,
+  Building2, Package, ChevronDown, Truck, Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth.store';
 import type { Product } from '@/types';
 import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
+import { SUPPLIERS_LIST_QUERY, SUPPLIER_WITH_PRODUCTS_QUERY } from '@/lib/graphql/suppliers.queries';
 import { LATEST_PRODUCT_COSTS, PRODUCT_PRICE_HISTORY } from '@/lib/graphql/pricing.queries';
 import { UPDATE_PRODUCT_PRICE, BULK_UPDATE_PRODUCT_PRICES } from '@/lib/graphql/pricing.mutations';
 import { Pagination } from '@/components/ui/pagination';
@@ -40,8 +42,13 @@ export default function PricingPage() {
   const branchId = user?.branch_id ?? '';
 
   const [query, setQuery] = useState('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
   const [defaultMargin, setDefaultMargin] = useState(25);
   const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [supplierSheetMode, setSupplierSheetMode] = useState(false);
+  const [supplierEdits, setSupplierEdits] = useState<Record<string, { price: string; reason: string }>>({});
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
@@ -52,11 +59,27 @@ export default function PricingPage() {
   const [page, setPage] = useState(1);
   const perPage = 12;
 
+  // Fetch suppliers for dropdown filter
+  const { data: suppliersData } = useQuery<{ suppliers: Array<{ id: string; name: string; isActive: boolean }> }>(
+    SUPPLIERS_LIST_QUERY,
+    { skip: !canManage, fetchPolicy: 'cache-and-network' },
+  );
+  const suppliers = useMemo(() => {
+    const unique = new Map<string, { id: string; name: string; isActive: boolean }>();
+    for (const s of suppliersData?.suppliers ?? []) {
+      if (s.isActive && !unique.has(s.id)) {
+        unique.set(s.id, s);
+      }
+    }
+    return Array.from(unique.values());
+  }, [suppliersData]);
+  const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
+
   // Search products (show all with empty query by using a space)
   const searchQuery = query.trim().length >= 2 ? query : 'a'; // Default search to show products
   const { data: searchData, loading: searchLoading, refetch } = useQuery<{ searchProducts: Product[] }>(
     SEARCH_PRODUCTS_QUERY,
-    { variables: { query: searchQuery, branchId, limit: 100 }, skip: !canManage || !branchId, fetchPolicy: 'cache-and-network' },
+    { variables: { query: searchQuery, branchId, limit: 200 }, skip: !canManage || !branchId, fetchPolicy: 'cache-and-network' },
   );
 
   const products = searchData?.searchProducts ?? [];
@@ -81,6 +104,15 @@ export default function PricingPage() {
 
   const [updatePrice, { loading: updating }] = useMutation(UPDATE_PRODUCT_PRICE);
   const [bulkUpdate, { loading: bulkUpdating }] = useMutation(BULK_UPDATE_PRODUCT_PRICES);
+
+  // Fetch supplier products when in sheet mode
+  const { data: supplierProductsData, loading: supplierProductsLoading, refetch: refetchSupplierProducts } = useQuery<
+    { supplierWithProducts: { id: string; name: string; products: Array<{ id: string; name: string; genericName?: string; barcode?: string; unitPrice: number; quantityOnHand: number; stockStatus: string }> } }
+  >(
+    SUPPLIER_WITH_PRODUCTS_QUERY,
+    { variables: { id: selectedSupplierId ?? '' }, skip: !supplierSheetMode || !selectedSupplierId, fetchPolicy: 'cache-and-network' }
+  );
+  const supplierProducts = supplierProductsData?.supplierWithProducts?.products ?? [];
 
   // Build rows with margin calculations
   const rows = useMemo(() => {
@@ -108,32 +140,46 @@ export default function PricingPage() {
     });
   }, [products, costMap, defaultMargin]);
 
-  // Filter by search
+  // Filter by search and supplier
   const filtered = useMemo(() => {
-    if (query.trim().length < 2) return rows;
-    const q = query.toLowerCase();
-    return rows.filter(r =>
-      r.product.name.toLowerCase().includes(q) ||
-      r.product.supplier?.name?.toLowerCase().includes(q) ||
-      r.product.barcode?.toLowerCase().includes(q)
-    );
-  }, [rows, query]);
+    let result = rows;
+    // Filter by supplier first
+    if (selectedSupplierId) {
+      result = result.filter(r => r.product.supplier?.id === selectedSupplierId);
+    }
+    // Then filter by search query
+    if (query.trim().length >= 2) {
+      const q = query.toLowerCase();
+      result = result.filter(r =>
+        r.product.name.toLowerCase().includes(q) ||
+        r.product.supplier?.name?.toLowerCase().includes(q) ||
+        r.product.barcode?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [rows, query, selectedSupplierId]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  useEffect(() => { setPage(1); }, [query]);
+  useEffect(() => { setPage(1); }, [query, selectedSupplierId]);
 
-  // Stats
+  // Stats - overall and filtered for selected supplier
   const stats = useMemo(() => {
-    let withCost = 0, belowMargin = 0, atLoss = 0;
-    for (const r of rows) {
-      if (r.hasCost) withCost++;
+    const targetRows = selectedSupplierId ? rows.filter(r => r.product.supplier?.id === selectedSupplierId) : rows;
+    let withCost = 0, belowMargin = 0, atLoss = 0, totalValue = 0, totalCostValue = 0;
+    for (const r of targetRows) {
+      if (r.hasCost) {
+        withCost++;
+        totalCostValue += r.costPesewas;
+        totalValue += r.sellPesewas;
+      }
       if (r.hasCost && r.marginPct < 20) belowMargin++;
       if (r.hasCost && r.marginPct <= 0) atLoss++;
     }
-    return { total: rows.length, withCost, belowMargin, atLoss };
-  }, [rows]);
+    const avgMargin = totalCostValue > 0 ? Math.round(((totalValue - totalCostValue) / totalCostValue) * 100) : 0;
+    return { total: targetRows.length, withCost, belowMargin, atLoss, avgMargin };
+  }, [rows, selectedSupplierId]);
 
   const handleSavePrice = async (productId: string) => {
     setError(null); setSuccess(null);
@@ -163,9 +209,71 @@ export default function PricingPage() {
     } catch (e: any) { setError(e?.message || 'Bulk update failed'); }
   };
 
+  // Supplier sheet mode handlers
+  const handleEnterSupplierSheet = () => {
+    if (!selectedSupplierId) return;
+    setSupplierSheetMode(true);
+    setSupplierEdits({});
+  };
+
+  const handleExitSupplierSheet = () => {
+    setSupplierSheetMode(false);
+    setSupplierEdits({});
+  };
+
+  const handleSupplierPriceChange = (productId: string, price: string) => {
+    setSupplierEdits(prev => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || { reason: '' }), price }
+    }));
+  };
+
+  const handleSupplierReasonChange = (productId: string, reason: string) => {
+    setSupplierEdits(prev => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || { price: '' }), reason }
+    }));
+  };
+
+  const handleSaveSupplierProductPrice = async (productId: string, currentPrice: number) => {
+    const edit = supplierEdits[productId];
+    if (!edit || !edit.price) return;
+    const pp = Math.round(parseFloat(edit.price) * 100);
+    if (isNaN(pp) || pp <= 0) { setError('Enter a valid price'); return; }
+    setSavingProductId(productId);
+    setError(null); setSuccess(null);
+    try {
+      await updatePrice({ variables: { input: { productId, unitPriceGhsPesewas: pp, reason: edit.reason?.trim() || 'Supplier price update' } } });
+      setSuccess('Price updated');
+      setSupplierEdits(prev => { const n = { ...prev }; delete n[productId]; return n; });
+      setTimeout(() => setSuccess(null), 2000);
+      refetchSupplierProducts();
+    } catch (e: any) { setError(e?.message || 'Failed to update price'); }
+    finally { setSavingProductId(null); }
+  };
+
+  const handleSaveAllSupplierPrices = async () => {
+    const updates = Object.entries(supplierEdits)
+      .filter(([, edit]) => edit.price && parseFloat(edit.price) > 0)
+      .map(([productId, edit]) => ({
+        productId,
+        unitPriceGhsPesewas: Math.round(parseFloat(edit.price) * 100),
+        reason: edit.reason?.trim() || 'Supplier price update',
+      }));
+    if (updates.length === 0) { setError('No price changes to save'); return; }
+    setError(null); setSuccess(null);
+    try {
+      await bulkUpdate({ variables: { input: { updates } } });
+      setSuccess(`${updates.length} prices updated`);
+      setSupplierEdits({});
+      setTimeout(() => setSuccess(null), 3000);
+      refetchSupplierProducts();
+    } catch (e: any) { setError(e?.message || 'Bulk update failed'); }
+  };
+
   if (!canManage) {
     return (
-      <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
         <div className="rounded-lg px-4 py-3 text-sm" style={{ border: '1px solid rgba(220,38,38,0.2)', background: 'rgba(220,38,38,0.06)', color: '#b91c1c' }}>
           Pricing control is restricted to managers and owners.
         </div>
@@ -179,12 +287,12 @@ export default function PricingPage() {
       <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(245,158,11,0.05) 100%)', borderBottom: '1px solid var(--surface-border)' }}>
         <div className="mx-auto max-w-[1440px] px-4 pt-5 pb-4 md:px-6">
           <Link href="/dashboard" className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold text-teal hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Dashboard</Link>
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Pricing Control</h1>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Cost-based margin pricing, manual overrides, and price history</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setShowBulkPanel(v => !v)}
                 className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white"
@@ -195,22 +303,49 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MiniKpi label="Products" value={String(stats.total)} color="#0d9488" />
-            <MiniKpi label="With Cost Data" value={String(stats.withCost)} color="#3b82f6" />
-            <MiniKpi label="Below 20% Margin" value={String(stats.belowMargin)} color={stats.belowMargin > 0 ? '#f59e0b' : '#16a34a'} />
-            <MiniKpi label="At Loss" value={String(stats.atLoss)} color={stats.atLoss > 0 ? '#dc2626' : '#16a34a'} />
+          {/* KPI strip - shows supplier-specific stats when filtered */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <MiniKpi
+              label={selectedSupplierId ? 'Supplier Products' : 'Products'}
+              value={String(stats.total)}
+              color="#0d9488"
+              icon={<Package size={12} />}
+            />
+            <MiniKpi
+              label="With Cost Data"
+              value={String(stats.withCost)}
+              color="#3b82f6"
+              icon={<DollarSign size={12} />}
+            />
+            <MiniKpi
+              label="Avg Margin"
+              value={`${stats.avgMargin}%`}
+              color={stats.avgMargin >= 25 ? '#16a34a' : stats.avgMargin >= 15 ? '#f59e0b' : '#dc2626'}
+              icon={<TrendingUp size={12} />}
+            />
+            <MiniKpi
+              label="Below 20% Margin"
+              value={String(stats.belowMargin)}
+              color={stats.belowMargin > 0 ? '#f59e0b' : '#16a34a'}
+              icon={<AlertTriangle size={12} />}
+            />
+            <MiniKpi
+              label="At Loss"
+              value={String(stats.atLoss)}
+              color={stats.atLoss > 0 ? '#dc2626' : '#16a34a'}
+              icon={<TrendingDown size={12} />}
+            />
           </div>
 
-          {/* Bulk margin panel */}
+          {/* Bulk margin panel - respects supplier filter */}
           {showBulkPanel && (
             <BulkMarginPanel
               defaultMargin={defaultMargin}
               onMarginChange={setDefaultMargin}
-              affectedCount={rows.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).length}
-              totalWithCost={stats.withCost}
-              previewRows={rows.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).slice(0, 4)}
+              selectedSupplierName={selectedSupplier?.name}
+              affectedCount={filtered.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).length}
+              totalWithCost={filtered.filter(r => r.hasCost).length}
+              previewRows={filtered.filter(r => r.hasCost && Math.abs(r.priceDiff) > 0).slice(0, 4)}
               loading={bulkUpdating}
               onApply={() => { void handleBulkApply(); setShowBulkPanel(false); }}
               onClose={() => setShowBulkPanel(false)}
@@ -224,20 +359,167 @@ export default function PricingPage() {
         {error && <div className="mb-4 rounded-lg px-4 py-2.5 text-sm" style={{ background: 'rgba(220,38,38,0.07)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>{error}</div>}
         {success && <div className="mb-4 rounded-lg px-4 py-2.5 text-sm" style={{ background: 'rgba(22,163,74,0.07)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }}><CheckCircle size={14} className="inline mr-1" />{success}</div>}
 
-        {/* Search */}
-        <div className="mb-4 flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
+        {/* Filter Bar - Search + Supplier */}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* Product Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search product, supplier, or barcode..."
-              className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm outline-none"
-              style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search product or barcode..."
+              className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm outline-none transition-all focus:ring-2 focus:ring-teal/20"
+              style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{filtered.length} products</span>
+
+          {/* Supplier Filter Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:bg-[var(--surface-hover)]"
+              style={{
+                background: selectedSupplierId ? 'rgba(13,148,136,0.08)' : 'var(--surface-card)',
+                borderColor: selectedSupplierId ? 'rgba(13,148,136,0.3)' : 'var(--surface-border)',
+                color: selectedSupplierId ? '#0d9488' : 'var(--text-primary)',
+              }}
+            >
+              <Truck size={14} />
+              <span className="max-w-[140px] truncate">
+                {selectedSupplier ? selectedSupplier.name : 'Filter by Supplier'}
+              </span>
+              <ChevronDown size={14} className={`transition-transform ${showSupplierDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Supplier Dropdown Menu */}
+            {showSupplierDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowSupplierDropdown(false)}
+                />
+                <div
+                  className="absolute left-0 top-full mt-1 z-50 w-72 max-h-80 overflow-y-auto rounded-xl border shadow-lg"
+                  style={{
+                    background: 'var(--surface-card)',
+                    borderColor: 'var(--surface-border)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  <div className="sticky top-0 bg-[var(--surface-card)] border-b p-2" style={{ borderColor: 'var(--surface-border)' }}>
+                    <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                      <Building2 size={12} />
+                      {suppliers.length} Active Suppliers
+                    </div>
+                  </div>
+
+                  {/* Show All Option */}
+                  <button
+                    onClick={() => { setSelectedSupplierId(null); setShowSupplierDropdown(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--surface-hover)]"
+                    style={{ background: !selectedSupplierId ? 'rgba(13,148,136,0.08)' : undefined }}
+                  >
+                    <Package size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span className="flex-1 text-left" style={{ color: !selectedSupplierId ? '#0d9488' : 'var(--text-primary)' }}>All Products</span>
+                    {!selectedSupplierId && <CheckCircle size={14} style={{ color: '#0d9488' }} />}
+                  </button>
+
+                  {/* Supplier List */}
+                  {suppliers.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No suppliers found</div>
+                  ) : (
+                    suppliers.map(supplier => {
+                      const productCount = rows.filter(r => r.product.supplier?.id === supplier.id).length;
+                      return (
+                        <button
+                          key={supplier.id}
+                          onClick={() => { setSelectedSupplierId(supplier.id); setShowSupplierDropdown(false); }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--surface-hover)] border-t"
+                          style={{ borderColor: 'var(--surface-border)', background: selectedSupplierId === supplier.id ? 'rgba(13,148,136,0.08)' : undefined }}
+                        >
+                          <Truck size={14} style={{ color: 'var(--text-muted)' }} />
+                          <span className="flex-1 text-left truncate" style={{ color: selectedSupplierId === supplier.id ? '#0d9488' : 'var(--text-primary)' }}>
+                            {supplier.name}
+                          </span>
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'var(--surface-base)', color: 'var(--text-muted)' }}>
+                            {productCount}
+                          </span>
+                          {selectedSupplierId === supplier.id && <CheckCircle size={14} style={{ color: '#0d9488' }} />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* View Supplier Price Sheet button */}
+          {selectedSupplierId && !supplierSheetMode && (
+            <button
+              onClick={handleEnterSupplierSheet}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-all hover:scale-[1.02]"
+              style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.25)' }}
+            >
+              <Package size={14} />
+              View Supplier Price Sheet
+            </button>
+          )}
+
+          {/* Clear Filters */}
+          {(selectedSupplierId || query) && !supplierSheetMode && (
+            <button
+              onClick={() => { setSelectedSupplierId(null); setQuery(''); }}
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors hover:bg-red-50"
+              style={{ color: '#dc2626' }}
+            >
+              <X size={12} />
+              Clear filters
+            </button>
+          )}
+
+          {/* Product Count Badge */}
+          <div className="flex items-center gap-2 ml-auto">
+            {selectedSupplierId && (
+              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488' }}>
+                <Truck size={10} className="inline mr-1" />
+                {selectedSupplier?.name}
+              </span>
+            )}
+            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
 
+        {/* Supplier Price Sheet Mode */}
+        {supplierSheetMode && selectedSupplierId ? (
+          <SupplierPriceSheet
+            supplierName={selectedSupplier?.name ?? ''}
+            products={supplierProducts}
+            edits={supplierEdits}
+            onPriceChange={handleSupplierPriceChange}
+            onReasonChange={handleSupplierReasonChange}
+            onSaveProduct={handleSaveSupplierProductPrice}
+            onSaveAll={handleSaveAllSupplierPrices}
+            onExit={handleExitSupplierSheet}
+            loading={supplierProductsLoading}
+            savingProductId={savingProductId}
+            hasChanges={Object.keys(supplierEdits).length > 0}
+          />
+        ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
           {/* Product pricing table */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+          <div className="rounded-2xl overflow-x-auto" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
             {/* Header */}
             <div className="hidden lg:grid items-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
               style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.02)', gridTemplateColumns: '1fr 90px 90px 90px 70px 120px' }}>
@@ -345,6 +627,7 @@ export default function PricingPage() {
           {/* Price History Sidebar */}
           <PriceHistorySidebar selectedId={selectedId} historyData={historyData?.productPriceHistory ?? []} historyLoading={historyLoading} />
         </div>
+        )}
       </div>
     </div>
   );
@@ -394,12 +677,224 @@ function PriceReasonSuggestions({ current, onSelect }: { current: string; onSele
   );
 }
 
+function SupplierPriceSheet({
+  supplierName,
+  products,
+  edits,
+  onPriceChange,
+  onReasonChange,
+  onSaveProduct,
+  onSaveAll,
+  onExit,
+  loading,
+  savingProductId,
+  hasChanges,
+}: {
+  supplierName: string;
+  products: Array<{ id: string; name: string; genericName?: string; barcode?: string; unitPrice: number; quantityOnHand: number; stockStatus: string }>;
+  edits: Record<string, { price: string; reason: string }>;
+  onPriceChange: (productId: string, price: string) => void;
+  onReasonChange: (productId: string, reason: string) => void;
+  onSaveProduct: (productId: string, currentPrice: number) => void;
+  onSaveAll: () => void;
+  onExit: () => void;
+  loading: boolean;
+  savingProductId: string | null;
+  hasChanges: boolean;
+}) {
+  const [globalReason, setGlobalReason] = useState('');
+  const pendingCount = Object.keys(edits).filter(id => edits[id]?.price).length;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4" style={{ background: 'rgba(13,148,136,0.06)', borderBottom: '1px solid var(--surface-border)' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center rounded-lg" style={{ background: 'rgba(13,148,136,0.12)', width: 40, height: 40 }}>
+            <Truck size={20} style={{ color: '#0d9488' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{supplierName}</h3>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Supplier Price Sheet — {products.length} products</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <button
+              onClick={onSaveAll}
+              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: '#0d9488' }}
+            >
+              <CheckCircle size={14} />
+              Save All ({pendingCount})
+            </button>
+          )}
+          <button
+            onClick={onExit}
+            className="rounded-lg px-3 py-2 text-xs font-semibold transition-colors hover:bg-gray-100"
+            style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}
+          >
+            Exit Sheet
+          </button>
+        </div>
+      </div>
+
+      {/* Global reason input */}
+      <div className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--surface-border)', background: 'rgba(0,0,0,0.02)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Default reason for all changes:</span>
+        <input
+          value={globalReason}
+          onChange={e => setGlobalReason(e.target.value)}
+          placeholder="e.g. Supplier price increase, Annual review..."
+          className="flex-1 max-w-md rounded-lg border px-3 py-1.5 text-xs"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Applied to empty reason fields</span>
+      </div>
+
+      {/* Products table */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[800px]">
+          {/* Header */}
+          <div className="grid items-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.02)', gridTemplateColumns: '2fr 1fr 100px 140px 140px 100px' }}>
+            <span>Product</span>
+            <span>Barcode</span>
+            <span className="text-right">Stock</span>
+            <span className="text-right">Current Price</span>
+            <span className="text-right">New Price</span>
+            <span className="text-center">Action</span>
+          </div>
+
+          {loading && products.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+            </div>
+          )}
+
+          {products.map(product => {
+            const edit = edits[product.id];
+            const hasEdit = edit?.price && parseFloat(edit.price) > 0;
+            const priceChanged = hasEdit && parseFloat(edit.price) * 100 !== product.unitPrice;
+
+            return (
+              <div key={product.id} className="grid items-center gap-2 px-4 py-3 border-b transition-colors hover:bg-[rgba(0,0,0,0.015)]"
+                style={{ borderColor: 'var(--surface-border)', gridTemplateColumns: '2fr 1fr 100px 140px 140px 100px' }}>
+                {/* Product */}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>{product.name}</p>
+                  {product.genericName && product.genericName !== product.name && (
+                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{product.genericName}</p>
+                  )}
+                </div>
+                {/* Barcode */}
+                <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{product.barcode || '—'}</span>
+                {/* Stock */}
+                <div className="text-right">
+                  <span className={`text-xs font-bold ${product.quantityOnHand <= 0 ? 'text-red-500' : 'text-teal-600'}`}>
+                    {product.quantityOnHand}
+                  </span>
+                  <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>{product.stockStatus}</span>
+                </div>
+                {/* Current Price */}
+                <span className="text-xs font-mono text-right" style={{ color: 'var(--text-secondary)' }}>{fmt(product.unitPrice)}</span>
+                {/* New Price Input */}
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={edit?.price ?? ''}
+                    onChange={e => onPriceChange(product.id, e.target.value)}
+                    placeholder={fmt(product.unitPrice)}
+                    className="w-full rounded-lg border px-2 py-1.5 text-xs font-mono text-right"
+                    style={{
+                      background: 'var(--surface-base)',
+                      borderColor: priceChanged ? 'rgba(13,148,136,0.5)' : 'var(--surface-border)',
+                      color: priceChanged ? '#0d9488' : 'var(--text-primary)',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={edit?.reason ?? ''}
+                    onChange={e => onReasonChange(product.id, e.target.value)}
+                    placeholder={globalReason || 'Reason...'}
+                    className="w-full rounded-lg border px-2 py-1 text-[10px]"
+                    style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-muted)' }}
+                  />
+                </div>
+                {/* Save button */}
+                <div className="flex justify-center">
+                  {hasEdit ? (
+                    <button
+                      onClick={() => {
+                        // Apply global reason if none provided
+                        if (globalReason && !edit?.reason) {
+                          onReasonChange(product.id, globalReason);
+                        }
+                        onSaveProduct(product.id, product.unitPrice);
+                      }}
+                      disabled={savingProductId === product.id}
+                      className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50 transition-all hover:scale-[1.02]"
+                      style={{ background: '#0d9488' }}
+                    >
+                      {savingProductId === product.id ? '...' : 'Save'}
+                    </button>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {products.length === 0 && !loading && (
+            <div className="p-12 text-center">
+              <Package className="mx-auto mb-3 h-8 w-8 opacity-20" />
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No products from this supplier</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface-base)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {pendingCount > 0 ? `${pendingCount} price change${pendingCount !== 1 ? 's' : ''} pending` : 'No pending changes'}
+        </span>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <>
+              <button
+                onClick={onSaveAll}
+                disabled={loading}
+                className="rounded-lg px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                style={{ background: '#0d9488' }}
+              >
+                Save All Changes
+              </button>
+              <button
+                onClick={onExit}
+                className="rounded-lg px-3 py-2 text-xs font-semibold"
+                style={{ border: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BulkMarginPanel({
-  defaultMargin, onMarginChange, affectedCount, totalWithCost,
+  defaultMargin, onMarginChange, selectedSupplierName, affectedCount, totalWithCost,
   previewRows, loading, onApply, onClose,
 }: {
   defaultMargin: number;
   onMarginChange: (v: number) => void;
+  selectedSupplierName?: string;
   affectedCount: number;
   totalWithCost: number;
   previewRows: Array<{ product: { name: string }; costFormatted: string; sellPesewas: number; suggestedSell: number }>;
@@ -416,10 +911,17 @@ function BulkMarginPanel({
         <div>
           <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             💰 Set Selling Prices by Profit Margin
+            {selectedSupplierName && (
+              <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: 'rgba(13,148,136,0.15)', color: '#0d9488' }}>
+                <Truck size={10} className="inline mr-1" />
+                {selectedSupplierName}
+              </span>
+            )}
           </h3>
           <p className="text-xs mt-1 max-w-xl leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            This tool automatically calculates the right selling price for each product so you always make a profit.
-            You choose how much profit you want (e.g. 25%), and it updates all your prices at once.
+            {selectedSupplierName
+              ? `This will update prices only for products from ${selectedSupplierName}. Choose your desired profit margin and the selling prices will be calculated automatically based on cost.`
+              : 'This tool automatically calculates the right selling price for each product so you always make a profit. You choose how much profit you want (e.g. 25%), and it updates all your prices at once.'}
           </p>
         </div>
         <button onClick={onClose} className="ml-4 shrink-0 text-xs font-bold rounded-lg px-2.5 py-1.5 hover:bg-surface-hover"
@@ -543,10 +1045,13 @@ function BulkMarginPanel({
   );
 }
 
-function MiniKpi({ label, value, color }: { label: string; value: string; color: string }) {
+function MiniKpi({ label, value, color, icon }: { label: string; value: string; color: string; icon?: React.ReactNode }) {
   return (
     <div className="rounded-2xl p-3" style={{ background: color + '08', border: '1px solid ' + color + '18' }}>
-      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        {icon && <span style={{ color }}>{icon}</span>}
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      </div>
       <p className="text-xl font-bold font-mono mt-0.5" style={{ color }}>{value}</p>
     </div>
   );

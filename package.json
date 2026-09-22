@@ -1,11 +1,11 @@
 {
   "name": "web",
   "version": "0.1.0",
-  "description": "PharmaPOS Pro - Next.js 16 PWA frontend for pharmacy point of sale management with inventory, compliance, and financial reporting",
+  "description": "Azzay Pharmacy Pro - Next.js 16 PWA frontend for pharmacy point of sale management with inventory, compliance, and financial reporting",
   "author": "Hanson Peprah from Advansis Technologies",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

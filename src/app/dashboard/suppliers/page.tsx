@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   PhoneCall,
   Mail,
@@ -15,6 +15,7 @@ import {
   Pencil,
   Trash2,
   PauseCircle,
+  DollarSign,
 } from 'lucide-react';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -34,6 +35,7 @@ import { PharmaProductVisual } from '@/components/dashboard/executive/pharma-pro
 import { StockLevelGauge } from '@/components/dashboard/executive/stock-level-gauge';
 import { SupplierHealthDonut } from '@/components/dashboard/executive/supplier-health-donut';
 import { SupplierFormModal } from '@/components/suppliers/supplier-form-modal';
+import { SupplierProductsModal } from '@/components/suppliers/supplier-products-modal';
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 
@@ -52,6 +54,8 @@ type AffectedProduct = {
 type SupplierWatch = {
   supplierId: string;
   supplierName: string;
+  supplierContactName?: string | null;
+  supplierAddress?: string | null;
   supplierPhone?: string | null;
   supplierEmail?: string | null;
   supplierAiScore?: number | null;
@@ -112,10 +116,12 @@ export default function SuppliersPage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'suspend' | 'delete' | 'delete-with-products'>('suspend');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [productsModalOpen, setProductsModalOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<{ id: string; name: string } | null>(null);
   const itemsPerPage = 10;
 
   /* ── Query ── */
-  const { data, loading, error } = useQuery<{ supplierRestockWatch: SupplierWatch[] }>(
+  const { data, loading, error, refetch } = useQuery<{ supplierRestockWatch: SupplierWatch[] }>(
     SUPPLIER_RESTOCK_WATCH,
     { fetchPolicy: 'cache-and-network', pollInterval: 15_000 },
   );
@@ -146,6 +152,8 @@ export default function SuppliersPage() {
     setEditingSupplier({
       id: s.supplierId,
       name: s.supplierName,
+      contactName: s.supplierContactName,
+      address: s.supplierAddress,
       phone: s.supplierPhone,
       email: s.supplierEmail,
     });
@@ -237,18 +245,31 @@ export default function SuppliersPage() {
               </p>
             </div>
             {canManageSuppliers && (
-              <button
-                type="button"
-                onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:brightness-110 active:scale-[0.97]"
-                style={{
-                  background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-                  boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
-                }}
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                New Supplier
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/dashboard/invoices/upload"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                  style={{
+                    color: 'var(--color-teal)',
+                    background: 'rgba(13,148,136,0.08)',
+                    border: '1px solid rgba(13,148,136,0.25)',
+                  }}
+                >
+                  AI Invoice Upload
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:brightness-110 active:scale-[0.97]"
+                  style={{
+                    background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                    boxShadow: '0 4px 14px rgba(13,148,136,0.35)',
+                  }}
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  New Supplier
+                </button>
+              </div>
             )}
           </div>
 
@@ -384,7 +405,7 @@ export default function SuppliersPage() {
 
         {/* ═══════════════════ DATA TABLE ═══════════════════ */}
         <div
-          className="overflow-hidden rounded-2xl"
+          className="overflow-x-auto rounded-2xl"
           style={{
             border: '1px solid var(--surface-border)',
             background: 'var(--surface-card)',
@@ -426,14 +447,27 @@ export default function SuppliersPage() {
                 Add your first supplier to start tracking stock levels, get reorder alerts, and manage your supply chain.
               </p>
               {canManageSuppliers && (
-                <button
-                  type="button"
-                  onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
-                >
-                  <Plus size={16} /> Add First Supplier
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <Link
+                    href="/dashboard/invoices/upload"
+                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                    style={{
+                      color: 'var(--color-teal)',
+                      background: 'rgba(13,148,136,0.08)',
+                      border: '1px solid rgba(13,148,136,0.25)',
+                    }}
+                  >
+                    AI Invoice Upload
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingSupplier(null); setFormOpen(true); }}
+                    className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
+                  >
+                    <Plus size={16} /> Add First Supplier
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -475,6 +509,10 @@ export default function SuppliersPage() {
               onSetActionType={setActionType}
               onConfirmDeactivate={handleDeactivate}
               onCancelDeactivate={() => setDeactivatingId(null)}
+              onViewProducts={() => {
+                setSelectedSupplier({ id: supplier.supplierId, name: supplier.supplierName });
+                setProductsModalOpen(true);
+              }}
             />
           ))}
         </div>
@@ -505,7 +543,21 @@ export default function SuppliersPage() {
           setFormOpen(false);
           setEditingSupplier(null);
         }}
+        onSuccess={() => refetch()}
       />
+
+      {/* Products modal */}
+      {selectedSupplier && (
+        <SupplierProductsModal
+          supplierId={selectedSupplier.id}
+          supplierName={selectedSupplier.name}
+          open={productsModalOpen}
+          onClose={() => {
+            setProductsModalOpen(false);
+            setSelectedSupplier(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -638,6 +690,7 @@ function SupplierRow({
   onSetActionType,
   onConfirmDeactivate,
   onCancelDeactivate,
+  onViewProducts,
 }: {
   supplier: SupplierWatch;
   canStock: boolean;
@@ -653,7 +706,9 @@ function SupplierRow({
   onSetActionType: (t: 'suspend' | 'delete' | 'delete-with-products') => void;
   onConfirmDeactivate: (id: string) => Promise<void>;
   onCancelDeactivate: () => void;
+  onViewProducts: () => void;
 }) {
+  const router = useRouter();
   const health = getHealthLevel(supplier);
   const hc = HEALTH_COLORS[health];
   const needsAction = supplier.outOfStockCount + supplier.criticalStockCount + supplier.lowStockCount > 0;
@@ -730,12 +785,18 @@ function SupplierRow({
           {/* Supplier name + contact */}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2
-                className="truncate text-sm font-bold"
-                style={{ color: 'var(--text-primary)' }}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/suppliers/${supplier.supplierId}`);
+                }}
+                className="truncate text-sm font-bold transition-colors hover:underline text-left"
+                style={{ color: 'var(--text-primary)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                title={`Open ${supplier.supplierName}`}
               >
                 {supplier.supplierName}
-              </h2>
+              </button>
               {needsAction && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold lg:hidden"
@@ -891,15 +952,30 @@ function SupplierRow({
               </a>
             )}
             {canManage && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onEdit(supplier); }}
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all duration-150"
-                style={{ background: 'rgba(0,0,0,0.03)', color: 'var(--text-secondary)' }}
-                title="Edit supplier"
-              >
-                <Pencil size={11} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onViewProducts(); }}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all duration-150"
+                  style={{
+                    background: 'rgba(13,148,136,0.1)',
+                    color: '#0d9488',
+                  }}
+                  title="View all products & update prices"
+                >
+                  <DollarSign size={11} />
+                  <span className="hidden xl:inline">Prices</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onEdit(supplier); }}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all duration-150"
+                  style={{ background: 'rgba(0,0,0,0.03)', color: 'var(--text-secondary)' }}
+                  title="Edit supplier"
+                >
+                  <Pencil size={11} />
+                </button>
+              </>
             )}
             {/* Suspend / Remove actions */}
             {ownerOnly && deactivatingId !== supplier.supplierId && (

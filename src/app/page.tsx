@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
+import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, LineChart, Network, Users, BrainCircuit, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { postLoginPathForRole } from '@/lib/auth/post-login-path';
@@ -42,14 +42,14 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-transparent transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <div className="flex items-center justify-center shrink-0">
               <Image src="/azzay_logo.png" alt="Azzay Pharmacy" width={32} height={32} className="object-contain" />
             </div>
             <span className="text-xl font-bold tracking-tight font-syne" style={{ color: 'var(--text-primary)' }}>
               Azzay Pharmacy <span className="font-normal" style={{ color: 'var(--color-teal)' }}>Pro</span>
             </span>
-          </div>
+          </Link>
           <PharmaNewsTicker />
           <div className="flex items-center gap-4 shrink-0 ml-auto">
             <a href="#pricing" className="text-sm font-medium hidden sm:block hover:opacity-80 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
@@ -228,7 +228,7 @@ export default function LandingPage() {
               className="px-8 py-4 rounded-xl text-lg font-semibold text-white transition-all active:scale-95 w-full sm:w-auto"
               style={{ background: 'var(--color-teal)' }}
             >
-              Start using PharmaPOS
+              Start using Azzay Pharmacy
             </Link>
             <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
               <CheckCircle2 size={16} style={{ color: 'var(--color-teal)' }} /> No credit card required

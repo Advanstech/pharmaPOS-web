@@ -10,6 +10,7 @@ import { getPendingSales, db } from '@/lib/db/offline.db';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_TAX_CONFIG, UPDATE_TAX_CONFIG } from '@/lib/graphql/tax-config';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { CHANGE_PASSWORD_MUTATION } from '@/lib/graphql/auth.queries';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string; Icon: typeof Sun }> = [
   { value: 'light', label: 'Light', description: 'Bright surfaces for daytime counters and back office.', Icon: Sun },
@@ -40,7 +41,7 @@ export default function DashboardSettingsPage() {
   }, []);
 
   return (
-    <div className="p-6 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Settings</h1>
       <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
         Appearance, display, and device preferences. Saved locally on this device.
@@ -83,7 +84,7 @@ export default function DashboardSettingsPage() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Increase the display size for large touch screens or night shifts. Recommended: 110% for pharmacy counters, 120% for wall-mounted displays.
           </p>
-          <div className="mt-4 grid grid-cols-5 gap-2">
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
             {ZOOM_OPTIONS.map(opt => {
               const selected = zoom === opt.value;
               return (
@@ -108,9 +109,9 @@ export default function DashboardSettingsPage() {
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Offline & Sync</h2>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            PharmaPOS works offline for cash sales. Transactions queue locally and sync when connection returns.
+            Azzay Pharmacy works offline for cash sales. Transactions queue locally and sync when connection returns.
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-xl p-3 text-center" style={{ background: isOnline ? 'rgba(22,163,74,0.06)' : 'rgba(220,38,38,0.06)', border: '1px solid ' + (isOnline ? 'rgba(22,163,74,0.2)' : 'rgba(220,38,38,0.2)') }}>
               <p className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Status</p>
               <p className="text-sm font-bold mt-1" style={{ color: isOnline ? '#16a34a' : '#dc2626' }}>{isOnline ? 'Online' : 'Offline'}</p>
@@ -136,7 +137,7 @@ export default function DashboardSettingsPage() {
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Mobile & Tablet</h2>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            PharmaPOS is optimized for tablets and phones. The POS terminal has a floating cart button on mobile. Dashboard pages stack vertically on smaller screens.
+            Azzay Pharmacy is optimized for tablets and phones. The POS terminal has a floating cart button on mobile. Dashboard pages stack vertically on smaller screens.
           </p>
           <div className="mt-3 text-[10px] space-y-1" style={{ color: 'var(--text-muted)' }}>
             <p>&bull; POS: Floating cart button on mobile, slide-up drawer for checkout</p>
@@ -148,8 +149,113 @@ export default function DashboardSettingsPage() {
 
         {/* ── Tax Configuration ── */}
         <TaxConfigSection />
+
+        {/* ── Security ── */}
+        <ChangePasswordSection />
       </div>
     </div>
+  );
+}
+
+function ChangePasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+
+  const [changePassword, { loading }] = useMutation(CHANGE_PASSWORD_MUTATION);
+
+  const canSubmit =
+    currentPassword.length >= 8
+    && newPassword.length >= 8
+    && confirmPassword.length >= 8
+    && newPassword === confirmPassword;
+
+  const handleSubmit = async () => {
+    setMessage(null);
+    if (!canSubmit) {
+      setMessage('Ensure passwords are at least 8 characters and both new password fields match.');
+      return;
+    }
+
+    try {
+      await changePassword({
+        variables: {
+          input: {
+            currentPassword,
+            newPassword,
+          },
+        },
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage('Password changed successfully. Please sign in again on other devices.');
+    } catch (e: unknown) {
+      setMessage(e instanceof Error ? e.message : 'Unable to change password.');
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border p-5" style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
+      <div className="flex items-center gap-2 mb-1">
+        <Database size={16} style={{ color: 'var(--color-teal)' }} />
+        <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Security</h2>
+      </div>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+        Change your account password. This will revoke existing sessions and require re-authentication.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Current password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          placeholder="New password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm"
+          style={{ background: 'var(--surface-base)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => void handleSubmit()}
+          disabled={loading || !canSubmit}
+          className="rounded-xl px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+          style={{ background: 'var(--color-teal)' }}
+        >
+          {loading ? 'Updating...' : 'Change Password'}
+        </button>
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          Minimum 8 characters.
+        </span>
+      </div>
+
+      {message && (
+        <p className="mt-3 text-xs" style={{ color: message.toLowerCase().includes('success') ? '#16a34a' : '#dc2626' }}>
+          {message}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -240,7 +346,7 @@ function TaxConfigSection() {
       {tax && !editing && (
         <div className="space-y-3">
           {/* Rate display */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'VAT (GRA)', value: tax.vatRatePct, desc: 'Standard rate' },
               { label: 'NHIL', value: tax.nhilRatePct, desc: 'Health insurance levy' },
@@ -254,7 +360,7 @@ function TaxConfigSection() {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-xl px-4 py-2.5" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)' }}>
+          <div className="flex items-center justify-between gap-3 rounded-xl px-4 py-2.5" style={{ background: 'rgba(13,148,136,0.06)', border: '1px solid rgba(13,148,136,0.15)' }}>
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Total Effective Rate</span>
             <span className="text-xl font-bold font-mono" style={{ color: 'var(--color-teal)' }}>{tax.totalRatePct}</span>
           </div>
@@ -324,7 +430,7 @@ function TaxConfigSection() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={handleSave} disabled={saving}
               className="rounded-xl px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
               style={{ background: 'var(--color-teal)' }}>

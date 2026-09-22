@@ -135,7 +135,7 @@ export default function AuditPage() {
     if (!report) return;
     const topFindings = ((report.allFindings as AuditFinding[]) ?? []).slice(0, 5);
     const body = [
-      'PharmaPOS Pro - Internal Audit Report',
+      'Azzay Pharmacy Pro - Internal Audit Report',
       `Period: ${periodStart} to ${periodEnd}`,
       '',
       `Overall risk score: ${report.overallRiskScore}/100 (${report.overallRiskRating})`,
@@ -151,11 +151,11 @@ export default function AuditPage() {
       '',
       'Please review the full exported PDF for details and action plan.',
     ].join('\n');
-    openMailClient('PharmaPOS Internal Audit - Decision Report', body);
+    openMailClient('Azzay Pharmacy Internal Audit - Decision Report', body);
   }
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

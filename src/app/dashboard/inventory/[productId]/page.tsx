@@ -200,7 +200,7 @@ export default function InventoryProductDetailPage() {
 
   if (!productId) {
     return (
-      <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+      <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
         <Link
           href="/dashboard/inventory"
           className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-teal)] hover:underline"
@@ -215,7 +215,7 @@ export default function InventoryProductDetailPage() {
   }
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       <Link
         href="/dashboard/inventory"
         className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-teal)] hover:underline"
@@ -625,7 +625,7 @@ function MovementsTable({ movements, movLoading, movError }: { movements: Moveme
 
   return (
     <div
-      className="mt-8 rounded-2xl border overflow-hidden"
+      className="mt-8 rounded-2xl border overflow-x-auto"
       style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}
     >
       <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--surface-border)' }}>

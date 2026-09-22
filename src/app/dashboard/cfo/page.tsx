@@ -114,7 +114,7 @@ export default function CfoPage() {
     const alerts = ((briefing.alerts as CfoAlert[]) ?? []).slice(0, 4);
     const recommendations = (((briefing.investmentIntelligence as { recommendations?: unknown[] })?.recommendations ?? []) as unknown[]).length;
     const body = [
-      'PharmaPOS Pro - CFO Briefing',
+      'Azzay Pharmacy Pro - CFO Briefing',
       `Generated: ${new Date(briefing.generatedAt as string).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}`,
       '',
       `Health score: ${briefing.healthScoreNumeric}/100`,
@@ -131,13 +131,13 @@ export default function CfoPage() {
       '',
       'Please see attached/printed PDF briefing for full details.',
     ].join('\n');
-    openMailClient('PharmaPOS CFO Briefing - Decision Report', body);
+    openMailClient('Azzay Pharmacy CFO Briefing - Decision Report', body);
   }
 
   return (
-    <div className="p-6" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
+    <div className="p-4 md:p-8" style={{ background: 'var(--surface-base)', minHeight: '100%' }}>
       {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-teal)]">
           <BrainCircuit size={20} className="text-white" />
         </div>
