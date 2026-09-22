@@ -5,8 +5,9 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wifi, WifiOff, Loader2, Stethoscope, LayoutDashboard, Home, LogOut } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, LayoutDashboard, Home, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function PosTopBar() {
   const router = useRouter();
@@ -54,11 +55,11 @@ export function PosTopBar() {
             title="Marketing home"
             aria-label="Go to marketing home"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/25 bg-black/20">
-              <Stethoscope size={14} className="text-white" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/25 bg-white/90">
+              <Image src="/azzay_logo.png" alt="Azzay Pharmacy" width={20} height={20} className="object-contain" />
             </div>
-            <span className="text-sm font-bold tracking-wide text-white underline-offset-2 hover:underline" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}>
-              PharmaPOS Pro
+            <span className="text-sm font-bold tracking-wide text-white underline-offset-2 hover:underline font-syne" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}>
+              Azzay Pharmacy Pro
             </span>
           </Link>
         </div>

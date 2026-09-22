@@ -14,6 +14,7 @@ import {
 import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { SmartTextarea } from '@/components/ui/smart-textarea';
+import { useToast, useConfirm, usePrompt } from '@/components/ui/toast';
 
 const STATUS_CONFIG: Record<string, { bg: string; color: string; icon: typeof Clock; label: string }> = {
   PENDING:    { bg: 'rgba(234,179,8,0.12)', color: '#a16207', icon: Clock, label: 'Pending' },
@@ -25,6 +26,9 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; icon: typeof Cl
 export default function StockTransfersPage() {
   const user = useAuthStore(s => s.user);
   const canManage = user && ['owner', 'se_admin', 'manager'].includes(user.role);
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
+  const { prompt } = usePrompt();
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -51,22 +55,24 @@ export default function StockTransfersPage() {
   }, [transfers]);
 
   const handleApprove = async (id: string) => {
-    if (!confirm('Approve this transfer? Stock will be deducted from the source branch.')) return;
-    try { await approveMutation({ variables: { transferId: id } }); }
-    catch (e: any) { alert(e?.message || 'Failed to approve'); }
+    const ok = await confirm({ title: 'Approve this transfer?', message: 'Stock will be deducted from the source branch.', confirmLabel: 'Approve & Ship', danger: false });
+    if (!ok) return;
+    try { await approveMutation({ variables: { transferId: id } }); success('Transfer approved', 'Stock deducted from source branch.'); }
+    catch (e: any) { toastError('Failed to approve', e?.message); }
   };
 
   const handleReceive = async (id: string) => {
-    if (!confirm('Confirm receipt? Stock will be added to your branch.')) return;
-    try { await receiveMutation({ variables: { transferId: id } }); }
-    catch (e: any) { alert(e?.message || 'Failed to receive'); }
+    const ok = await confirm({ title: 'Confirm receipt?', message: 'Stock will be added to your branch inventory.', confirmLabel: 'Confirm Receipt' });
+    if (!ok) return;
+    try { await receiveMutation({ variables: { transferId: id } }); success('Receipt confirmed', 'Stock added to your branch.'); }
+    catch (e: any) { toastError('Failed to receive', e?.message); }
   };
 
   const handleCancel = async (id: string) => {
-    const reason = prompt('Reason for cancellation:');
+    const reason = await prompt({ title: 'Cancel transfer', message: 'Provide a reason for cancellation.', placeholder: 'e.g. Wrong products selected', required: true, confirmLabel: 'Cancel Transfer' });
     if (!reason) return;
-    try { await cancelMutation({ variables: { transferId: id, reason } }); }
-    catch (e: any) { alert(e?.message || 'Failed to cancel'); }
+    try { await cancelMutation({ variables: { transferId: id, reason } }); success('Transfer cancelled'); }
+    catch (e: any) { toastError('Failed to cancel', e?.message); }
   };
 
   return (

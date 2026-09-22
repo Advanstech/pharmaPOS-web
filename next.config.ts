@@ -130,23 +130,10 @@ const nextConfig: NextConfig = {
     // Enable optimized font loading
     optimizeServerReact: true,
     
-    // Parallel route prefetching for faster navigation
-    parallelServerCompiles: true,
-    
     // Faster server actions
     serverActions: {
       bodySizeLimit: '2mb',
     },
-    
-    // Optimize package imports
-    optimizePackageImports: [
-      'lucide-react',
-      'framer-motion',
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-toast',
-      '@radix-ui/react-tooltip',
-    ],
   },
   
   // ── Production Optimizations ───────────────────────────────────────────────

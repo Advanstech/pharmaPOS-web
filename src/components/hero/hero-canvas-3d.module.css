@@ -1,0 +1,38 @@
+.canvasWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: auto; /* Required to catch mouse events for 3D interactions */
+}
+
+/* Fallback gradient if WebGL fails */
+.fallbackGradient {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 70% 30%, rgba(0, 191, 166, 0.15) 0%, var(--brand-navy) 60%);
+  z-index: 0;
+}
+
+.particleTooltip {
+  background: rgba(10, 22, 40, 0.85);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-white);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transform: translate3d(-50%, -150%, 0);
+  transition: opacity 0.2s ease;
+  opacity: 1;
+}
+
+.particleTooltip.hidden {
+  opacity: 0;
+}

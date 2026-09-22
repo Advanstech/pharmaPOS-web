@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ShoppingCart, LogOut, Stethoscope, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShoppingCart, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { DASHBOARD_NAV } from '@/lib/auth/dashboard-nav';
@@ -11,6 +11,7 @@ import { roleForAccess } from '@/lib/auth/post-login-path';
 import { useRef, useState } from 'react';
 import { useNestedLenis } from '@/lib/lenis/use-nested-lenis';
 import { BranchSwitcher } from '@/components/dashboard/branch-switcher';
+import Image from 'next/image';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -65,18 +66,12 @@ export function Sidebar() {
         )}
         style={{ borderBottom: '1px solid var(--surface-border)' }}
       >
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, var(--color-teal-dark), var(--color-teal))',
-            boxShadow: '0 2px 10px rgba(0,78,87,0.35)',
-          }}
-        >
-          <Stethoscope size={14} className="text-white" />
+        <div className="flex h-8 w-8 items-center justify-center shrink-0">
+          <Image src="/azzay_logo.png" alt="Azzay Pharmacy" width={32} height={32} className="object-contain" />
         </div>
         <div className={cn("min-w-0 ml-2.5 transition-opacity duration-200", collapsed ? "hidden" : "hidden md:block")}>
-          <p className="text-sm font-bold leading-none truncate" style={{ color: 'color-mix(in oklab, var(--text-primary) 86%, #000 14%)' }}>
-            PharmaPOS Pro
+          <p className="text-sm font-bold leading-none truncate font-syne" style={{ color: 'color-mix(in oklab, var(--text-primary) 86%, #000 14%)' }}>
+            Azzay Pharmacy Pro
           </p>
           <p className="text-[10px] mt-0.5 truncate" style={{ color: 'color-mix(in oklab, var(--text-secondary) 88%, #000 12%)' }}>
             {user?.branchName || 'Azzay Pharmacy'}

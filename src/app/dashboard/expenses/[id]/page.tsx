@@ -25,6 +25,7 @@ import { GET_EXPENSE } from '@/lib/graphql/expenses.queries';
 import { APPROVE_STAFF_EXPENSE } from '@/lib/graphql/expenses.mutations';
 import { SmartTextarea } from '@/components/ui/smart-textarea';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { useToast } from '@/components/ui/toast';
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; border: string; icon: typeof Clock }> = {
   PENDING:    { label: 'Pending Approval', bg: 'rgba(234,179,8,0.1)',  color: '#a16207', border: 'rgba(234,179,8,0.3)',  icon: Clock },
@@ -47,6 +48,7 @@ export default function ExpenseDetailPage() {
   const expenseId = params.id as string;
   const user = useAuthStore(s => s.user);
   const canApprove = user && ['owner', 'se_admin', 'manager'].includes(user.role);
+  const { success, error: toastError } = useToast();
 
   const [showApprovalForm, setShowApprovalForm] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
@@ -72,7 +74,7 @@ export default function ExpenseDetailPage() {
   const handleApproval = async () => {
     if (!expense) return;
     if (approvalAction === 'reject' && !approvalNotes.trim()) {
-      alert('Please provide a reason for rejection.');
+      toastError('Reason required', 'Please provide a reason for rejection.');
       return;
     }
 
@@ -88,9 +90,11 @@ export default function ExpenseDetailPage() {
           },
         },
       });
+      approvalAction === 'approve'
+        ? success('Expense approved', expense.amountFormatted)
+        : success('Expense rejected');
     } catch (err: any) {
-      console.error('Expense action failed:', err);
-      alert(err?.message || 'Failed to process expense. Please try again.');
+      toastError('Failed', err?.message || 'Failed to process expense. Please try again.');
     } finally {
       setProcessing(false);
     }

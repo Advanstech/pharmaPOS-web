@@ -402,8 +402,8 @@ function StatementsTab({ pl, balanceSheet, trialBalance }: any) {
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Assets</h3>
             </div>
             <div className="p-4">
-              {balanceSheet.assets.map((a: any) => (
-                <div key={a.accountCode} className="flex items-center justify-between py-1.5">
+              {balanceSheet.assets.map((a: any, i: number) => (
+                <div key={`asset-${a.accountCode}-${i}`} className="flex items-center justify-between py-1.5">
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{a.accountCode} {a.accountName}</span>
                   <span className="text-xs font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{a.balanceFormatted}</span>
                 </div>
@@ -422,8 +422,8 @@ function StatementsTab({ pl, balanceSheet, trialBalance }: any) {
                 <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Liabilities</h3>
               </div>
               <div className="p-4">
-                {balanceSheet.liabilities.map((l: any) => (
-                  <div key={l.accountCode} className="flex items-center justify-between py-1.5">
+                {balanceSheet.liabilities.map((l: any, i: number) => (
+                  <div key={`liability-${l.accountCode}-${i}`} className="flex items-center justify-between py-1.5">
                     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{l.accountCode} {l.accountName}</span>
                     <span className="text-xs font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{l.balanceFormatted}</span>
                   </div>
@@ -440,8 +440,8 @@ function StatementsTab({ pl, balanceSheet, trialBalance }: any) {
                 <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Equity</h3>
               </div>
               <div className="p-4">
-                {balanceSheet.equity.map((e: any) => (
-                  <div key={e.accountCode} className="flex items-center justify-between py-1.5">
+                {balanceSheet.equity.map((e: any, i: number) => (
+                  <div key={`equity-${e.accountCode}-${i}`} className="flex items-center justify-between py-1.5">
                     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.accountCode} {e.accountName}</span>
                     <span className="text-xs font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{e.balanceFormatted}</span>
                   </div>

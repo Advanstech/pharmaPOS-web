@@ -2,13 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Brand tokens ─────────────────────────────────────────────────────────── */
+  /* ── Brand tokens ─────────────────────────────────────────────────────────── */
 :root {
   --color-teal:        #006D77;
   --color-teal-dark:   #004E57;
   --color-teal-light:  #C8E6EA;
   --color-gold:        #E8A838;
   --color-gold-surface:#FDF3DC;
+
+  /* Azzay Pharmacy Pro 3D Theme */
+  --brand-navy:    #0A1628;
+  --brand-teal:    #00BFA6;
+  --brand-electric:#1DE9B6;
+  --brand-white:   #F0F6FF;
+  --brand-amber:   #FFB300;   /* alerts / low stock */
+  --brand-danger:  #FF3D57;   /* expired / critical */
+  --brand-glass:   rgba(255,255,255,0.06);
+  --brand-border:  rgba(0,191,166,0.25);
 
   /* Classification */
   --color-otc:        #16a34a;
@@ -38,7 +48,9 @@
 
   /* Fonts */
   --font-inter: 'Inter Variable', system-ui, sans-serif;
-  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono:  'DM Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-syne:  'Syne', 'Inter Variable', system-ui, sans-serif;
+  --font-dm-sans: 'DM Sans', 'Inter Variable', system-ui, sans-serif;
 
   /* Radius */
   --radius-sm:  8px;

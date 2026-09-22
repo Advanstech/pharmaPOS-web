@@ -29,6 +29,7 @@ import { isBranchWideSalesRole } from '@/lib/auth/sales-visibility';
 import { ReceiptModal } from '@/components/pos/receipt-modal';
 import { SmartTextarea } from '@/components/ui/smart-textarea';
 import type { CartItem } from '@/types';
+import { useToast } from '@/components/ui/toast';
 
 type SaleDetail = {
   id: string;
@@ -110,6 +111,7 @@ export default function SaleDetailPage() {
   const router = useRouter();
   const saleId = typeof params.saleId === 'string' ? params.saleId : '';
   const { user } = useAuthStore();
+  const { success } = useToast();
   const shouldReduceMotion = useReducedMotion();
   const [showReceipt, setShowReceipt] = useState(false);
   const [showRefund, setShowRefund] = useState(false);
@@ -125,8 +127,11 @@ export default function SaleDetailPage() {
   });
 
   const [requestRefund, { loading: requesting }] = useMutation(REQUEST_REFUND, {
-    onCompleted: () => { setShowRefund(false); setRefundReason(''); setRefundError(null);
-      alert('Refund request submitted! Your manager will review it.');
+    onCompleted: () => {
+      setShowRefund(false);
+      setRefundReason('');
+      setRefundError(null);
+      success('Refund request submitted', 'Your manager will review it shortly.');
     },
     onError: (err) => setRefundError(err.message),
   });

@@ -10,6 +10,7 @@ import { LOGIN_MUTATION } from '@/lib/graphql/auth.queries';
 import { postLoginPathForRole, asUserRole } from '@/lib/auth/post-login-path';
 import type { AuthUser } from '@/types';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface LoginResult {
   login: {
@@ -127,8 +128,7 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#fff',
-    background: 'linear-gradient(145deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, #00838F 100%)',
+    background: '#fff',
     boxShadow: '0 8px 28px rgba(0,109,119,0.3), 0 2px 8px rgba(0,0,0,0.1)',
     flexShrink: 0,
   },
@@ -423,7 +423,7 @@ export default function LoginPage() {
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
               >
-                <ShieldCheck size={30} strokeWidth={1.7} />
+                <Image src="/azzay_logo.png" alt="Azzay Pharmacy" width={60} height={60} className="object-contain" />
               </motion.div>
               <motion.div
                 initial={prefersReduced ? false : { opacity: 0, y: 8 }}
@@ -431,7 +431,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.18 }}
                 style={{ textAlign: 'center' }}
               >
-                <h1 style={S.title}>PharmaPOS Pro</h1>
+                <h1 style={S.title}>Azzay Pharmacy Pro</h1>
                 <p style={S.subtitle}>Azzay Pharmacy &nbsp;·&nbsp; Accra, Ghana</p>
               </motion.div>
             </Link>
@@ -545,7 +545,7 @@ export default function LoginPage() {
                   Signing in…
                 </>
               ) : (
-                'Sign in to PharmaPOS'
+                'Sign in to Azzay Pharmacy'
               )}
             </motion.button>
           </form>

@@ -40,7 +40,7 @@ export function MobileTopBar() {
             <div className="flex h-6 w-6 items-center justify-center rounded-lg" style={{ background: 'var(--color-teal)' }}>
               <Stethoscope size={12} className="text-white" />
             </div>
-            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>PharmaPOS</span>
+            <span className="text-xs font-bold font-syne" style={{ color: 'var(--text-primary)' }}>Azzay Pharmacy</span>
           </div>
         </div>
         <Link href="/pos" className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white" style={{ background: 'var(--color-teal)' }}>

@@ -69,11 +69,11 @@ export function ReceiptModal({
               </div>
 
               {/* Receipt body */}
-              <div id="printable-receipt" className="bg-surface-card p-6 text-content-primary">
+              <div id="printable-receipt" className="bg-surface-card p-4 sm:p-6 text-content-primary">
               <div className="text-center mb-6">
-                <h3 className="font-bold text-lg mb-1 tracking-tight">PHARMA POS</h3>
-                <p className="text-xs text-content-secondary">123 Health Street, Accra, Ghana</p>
-                <p className="text-xs text-content-secondary">Tel: +233 24 123 4567</p>
+                <h3 className="font-bold text-xl mb-1 tracking-tighter font-syne uppercase">Azzay Pharmacy</h3>
+                <p className="text-xs font-mono text-content-secondary">123 Health Street, Accra, Ghana</p>
+                <p className="text-xs font-mono text-content-secondary">Tel: +233 24 123 4567</p>
                 <hr className="my-4 border-dashed border-surface-border" />
               </div>
 

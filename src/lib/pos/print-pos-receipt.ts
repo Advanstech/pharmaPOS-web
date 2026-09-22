@@ -18,11 +18,10 @@ function receiptDocumentStyles(): string {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .receipt-wrap { max-width: 420px; margin: 0 auto; }
+    .receipt-wrap { max-width: 300px; margin: 0 auto; }
     .bg-surface-card { background: #fff !important; }
-    .bg-teal, .print-receipt-header { background: #006d77 !important; color: #fff !important; }
-    .text-gold { color: #e8a838 !important; }
-    .text-teal-100 { color: rgba(255,255,255,0.88) !important; }
+    /* Hide the success header when printing */
+    .print-receipt-header { display: none !important; }
     .text-white { color: #fff !important; }
     .text-content-primary { color: #0d1b1e !important; }
     .text-content-secondary, .text-content-muted { color: #4a6670 !important; }
@@ -63,7 +62,10 @@ function receiptDocumentStyles(): string {
     .pos-receipt-meta { font-size: 11px !important; line-height: 1.35 !important; }
     .font-bold { font-weight: 700 !important; }
     .font-medium { font-weight: 500 !important; }
-    .font-mono { font-family: ui-monospace, monospace !important; }
+    .font-mono { font-family: 'DM Mono', ui-monospace, monospace !important; }
+    .font-syne { font-family: 'Syne', ui-sans-serif, sans-serif !important; }
+    .uppercase { text-transform: uppercase !important; }
+    .tracking-tighter { letter-spacing: -0.05em !important; }
     .leading-snug { line-height: 1.375 !important; }
     .tracking-tight { letter-spacing: -0.025em !important; }
     .space-y-2 > * + * { margin-top: 0.5rem !important; }
@@ -73,8 +75,9 @@ function receiptDocumentStyles(): string {
     hr { border: 0; border-top: 1px dashed #e8edf0; margin: 1rem 0; }
     svg { display: block; max-width: 100%; height: auto; }
     @media print {
-      body { padding: 0; }
-      .receipt-wrap { max-width: none; }
+      body { padding: 0; margin: 0; }
+      .receipt-wrap { max-width: 80mm; width: 100%; margin: 0; padding: 0; }
+      .print-receipt-header { display: none !important; }
     }
   `;
 }
@@ -86,7 +89,7 @@ export function printPosReceiptFromElement(printArea: HTMLElement): void {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PharmaPOS — Receipt</title>
+  <title>Azzay Pharmacy — Receipt</title>
   <style>${receiptDocumentStyles()}</style>
 </head>
 <body>

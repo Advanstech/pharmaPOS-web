@@ -1,0 +1,143 @@
+.medCard {
+  background: var(--brand-glass);
+  border: 1px solid var(--brand-border);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.medCard:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 191, 166, 0.25),
+              0 0 0 1px rgba(0, 191, 166, 0.4);
+}
+
+.cardCanvas {
+  position: relative;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(0, 191, 166, 0.08) 0%,
+    rgba(10, 22, 40, 0.6) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 130px;
+  flex-shrink: 0;
+}
+
+.stockBadge {
+  position: absolute;
+  top: 8px; 
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 10;
+}
+
+.stockBadgeOk {
+  background: rgba(22, 163, 74, 0.15);
+  border: 1px solid #16a34a;
+  color: #16a34a;
+}
+
+.stockBadgeLow {
+  background: rgba(255, 179, 0, 0.15);
+  border: 1px solid #FFB300;
+  color: #FFB300;
+}
+
+.stockBadgeCritical {
+  background: rgba(255, 61, 87, 0.15);
+  border: 1px solid #FF3D57;
+  color: #FF3D57;
+}
+
+.cardBody {
+  padding: 12px 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardName {
+  font-family: var(--font-syne);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.cardStrength {
+  font-family: var(--font-dm-sans);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cardCategory {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: auto;
+}
+
+.cardFooter {
+  padding: 12px 16px;
+  border-top: 1px solid var(--surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-base);
+}
+
+.price {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-teal);
+}
+
+.addBtn {
+  background: var(--color-teal);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.addBtn:hover {
+  background: var(--color-teal-dark);
+  box-shadow: 0 4px 12px rgba(0, 109, 119, 0.3);
+}
+
+.addBtn:active {
+  transform: scale(0.95);
+}
+
+/* Fallback for when WebGL is not available */
+.fallbackIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(0,191,166,0.2) 0%, rgba(10,22,40,0.4) 100%);
+  border: 1px solid var(--brand-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-teal);
+  box-shadow: inset 0 2px 10px rgba(255,255,255,0.05);
+}

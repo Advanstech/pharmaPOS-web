@@ -1,13 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, BrainCircuit, Pill, AlertTriangle, ShieldCheck,
   Heart, Baby, Thermometer, BookOpen, ExternalLink, Sparkles,
-  Loader2, MessageSquare, RefreshCw,
+  Loader2, MessageSquare, RefreshCw, X, Package, ChevronDown,
 } from 'lucide-react';
+import { useLazyQuery } from '@apollo/client';
 import type { DrugIntelligence } from '@/app/api/drug-intelligence/route';
+import { SEARCH_PRODUCTS_QUERY } from '@/lib/graphql/products.queries';
+import { useAuthStore } from '@/lib/store/auth.store';
+
+import { aiFetch } from '@/lib/ai/fetch-with-auth';
+
+const HISTORY_KEY = 'pharmapos-drug-search-history';
 
 const QUICK_SEARCHES = [
   'Amoxicillin', 'Paracetamol', 'Metformin', 'Amlodipine',
@@ -25,36 +32,136 @@ const SECTIONS: Array<{ id: Section; label: string; icon: typeof Pill }> = [
   { id: 'ghana', label: 'Ghana', icon: Heart },
 ];
 
+interface ProductOption {
+  id: string;
+  name: string;
+  genericName?: string;
+  classification?: string;
+  inventory?: { quantityOnHand: number };
+}
+
 export function DrugSearchIntelligence() {
+  const branchId = useAuthStore(s => s.user?.branch_id);
   const [query, setQuery] = useState('');
   const [data, setData] = useState<DrugIntelligence | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const [history, setHistory] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const search = useCallback(async (drugName: string) => {
-    if (!drugName.trim()) return;
+  // Apollo lazy query for product search
+  const [searchProducts, { data: productsData, loading: productsLoading }] = useLazyQuery(SEARCH_PRODUCTS_QUERY, {
+    fetchPolicy: 'cache-first',
+  });
+
+  // Load search history from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HISTORY_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        if (Array.isArray(parsed)) {
+          setHistory(parsed.slice(0, 10));
+        }
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  // Persist history to localStorage
+  useEffect(() => {
+    try {
+      if (history.length > 0) {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [history]);
+
+  // Debounced product search
+  useEffect(() => {
+    if (!query.trim() || query.length < 2 || !branchId) {
+      setShowDropdown(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void searchProducts({ variables: { query, branchId, limit: 8 } });
+      setShowDropdown(true);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, branchId, searchProducts]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const handleSelectProduct = (product: ProductOption) => {
+    setSelectedProduct(product);
+    setQuery(product.name);
+    setShowDropdown(false);
+    // Auto-trigger AI search with product data
+    void searchWithProduct(product);
+  };
+
+  const searchWithProduct = useCallback(async (product: ProductOption) => {
     setLoading(true);
     setError(null);
     setData(null);
     setActiveSection('overview');
     try {
-      const res = await fetch('/api/drug-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: drugName.trim(), genericName: '', classification: 'OTC' }),
+      const res = await aiFetch('/api/drug-intelligence', {
+        name: product.name,
+        genericName: product.genericName || '',
+        classification: product.classification || 'OTC',
       });
       if (!res.ok) throw new Error('Failed');
       const json = await res.json() as DrugIntelligence;
       setData(json);
-      setHistory(prev => [drugName, ...prev.filter(h => h.toLowerCase() !== drugName.toLowerCase())].slice(0, 8));
+      setHistory(prev => [product.name, ...prev.filter(h => h.toLowerCase() !== product.name.toLowerCase())].slice(0, 10));
     } catch {
       setError('Could not load drug intelligence. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const search = useCallback(async (drugName: string) => {
+    if (!drugName.trim()) return;
+    // If we have a selected product matching the query, use its data
+    if (selectedProduct && selectedProduct.name.toLowerCase() === drugName.toLowerCase()) {
+      return searchWithProduct(selectedProduct);
+    }
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setActiveSection('overview');
+    try {
+      const res = await aiFetch('/api/drug-intelligence', {
+        name: drugName.trim(), genericName: '', classification: 'OTC',
+      });
+      if (!res.ok) throw new Error('Failed');
+      const json = await res.json() as DrugIntelligence;
+      setData(json);
+      setHistory(prev => [drugName, ...prev.filter(h => h.toLowerCase() !== drugName.toLowerCase())].slice(0, 10));
+    } catch {
+      setError('Could not load drug intelligence. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedProduct, searchWithProduct]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,20 +205,100 @@ export function DrugSearchIntelligence() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+            <div ref={dropdownRef} className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: 'var(--text-muted)' }} />
               <input
+                ref={inputRef}
                 type="text"
                 value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search any drug — e.g. Amoxicillin, Metformin, Artemether..."
-                className="w-full rounded-xl py-3 pl-9 pr-4 text-sm font-medium outline-none transition-all"
+                onChange={e => { setQuery(e.target.value); setSelectedProduct(null); }}
+                onFocus={() => { if (query.length >= 2 && productsData?.searchProducts?.length) setShowDropdown(true); }}
+                placeholder="Search products or type any drug name..."
+                className="w-full rounded-xl py-3 pl-9 pr-10 text-sm font-medium outline-none transition-all"
                 style={{
                   background: 'var(--surface-card)',
-                  border: '1px solid var(--surface-border)',
+                  border: selectedProduct ? '1px solid rgba(0,109,119,0.4)' : '1px solid var(--surface-border)',
                   color: 'var(--text-primary)',
                 }}
               />
+              {selectedProduct && (
+                <Package size={16} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-teal)' }} />
+              )}
+
+              {/* Product suggestions dropdown */}
+              <AnimatePresence>
+                {showDropdown && productsData?.searchProducts?.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl overflow-hidden shadow-lg"
+                    style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)' }}
+                  >
+                    <div className="max-h-[280px] overflow-y-auto">
+                      {productsLoading ? (
+                        <div className="p-3 space-y-2">
+                          {[1, 2, 3].map(i => (
+                            <div key={i} className="h-10 rounded-lg bg-gray-100 animate-pulse" />
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)', background: 'var(--surface-base)' }}>
+                            From your inventory ({productsData.searchProducts.length})
+                          </div>
+                          {productsData.searchProducts.map((product: ProductOption) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => handleSelectProduct(product)}
+                              className="w-full text-left px-3 py-2.5 hover:bg-teal/5 transition-colors border-b border-transparent last:border-0"
+                              style={{ borderColor: 'var(--surface-border)' }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                                    {product.name}
+                                  </p>
+                                  {product.genericName && product.genericName !== product.name && (
+                                    <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                                      {product.genericName}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 ml-2">
+                                  {product.inventory?.quantityOnHand !== undefined && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                      style={{
+                                        background: product.inventory.quantityOnHand > 10 ? 'rgba(21,128,61,0.1)' : 'rgba(180,83,9,0.1)',
+                                        color: product.inventory.quantityOnHand > 10 ? '#15803d' : '#b45309',
+                                      }}
+                                    >
+                                      {product.inventory.quantityOnHand} in stock
+                                    </span>
+                                  )}
+                                  {product.classification && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase"
+                                      style={{ background: 'rgba(0,109,119,0.1)', color: 'var(--color-teal-dark)' }}
+                                    >
+                                      {product.classification}
+                                    </span>
+                                  )}
+                                  <ChevronDown size={14} className="rotate-[-90deg]" style={{ color: 'var(--text-muted)' }} />
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                    <div className="px-3 py-2 text-[10px] text-center" style={{ color: 'var(--text-muted)', background: 'var(--surface-base)', borderTop: '1px solid var(--surface-border)' }}>
+                      Press Enter to search without selecting
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <button
               type="submit"
@@ -147,9 +334,18 @@ export function DrugSearchIntelligence() {
       {/* Recent searches */}
       {history.length > 0 && !data && !loading && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-            Recent searches
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              Recent searches
+            </p>
+            <button
+              onClick={() => { setHistory([]); localStorage.removeItem(HISTORY_KEY); }}
+              className="text-[10px] font-semibold hover:underline"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Clear
+            </button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {history.map(h => (
               <button

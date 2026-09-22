@@ -124,6 +124,35 @@ export const REFUND_REQUESTS = gql`
   }
 `;
 
+export const GET_REFUND_REQUEST = gql`
+  query RefundRequest($id: ID!) {
+    refundRequest(id: $id) {
+      id
+      saleId
+      saleTotalFormatted
+      reason
+      status
+      requestedByName
+      reviewedByName
+      reviewNotes
+      reviewedAt
+      createdAt
+      saleItemCount
+      cashierName
+      branchName
+      vatPesewas
+      subtotalPesewas
+      items {
+        productId
+        productName
+        quantity
+        unitPricePesewas
+        vatExempt
+      }
+    }
+  }
+`;
+
 export const APPROVE_REFUND_REQUEST = gql`
   mutation ApproveRefundRequest($requestId: ID!, $notes: String) {
     approveRefundRequest(requestId: $requestId, notes: $notes) {

@@ -31,8 +31,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'pharmapos-auth',
-      // Only persist user profile — tokens are re-acquired on page load via refresh
-      partialize: (s) => ({ user: s.user }),
+      // Persist user profile + refresh token so silent token refresh works on page reload
+      // Access token stays memory-only for security
+      partialize: (s) => ({ user: s.user, refreshToken: s.refreshToken }),
     },
   ),
 );

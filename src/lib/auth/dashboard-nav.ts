@@ -19,6 +19,7 @@ import {
   Contact,
   CalendarCheck,
   ArrowLeftRight,
+  RotateCcw,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 
@@ -162,6 +163,12 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
     label: 'Sales',
     icon: Receipt,
     roles: ['owner', 'se_admin', 'manager', 'cashier', 'chemical_cashier', 'pharmacist', 'head_pharmacist'],
+  },
+  {
+    href: '/dashboard/refunds',
+    label: 'Refunds',
+    icon: RotateCcw,
+    roles: ['owner', 'se_admin', 'manager'],
   },
   {
     href: '/dashboard/end-of-day',

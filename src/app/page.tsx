@@ -3,72 +3,26 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
-import { ShieldCheck, WifiOff, BarChart3, Pill, ArrowRight, CheckCircle2, Stethoscope, Activity, CreditCard, Clock, Syringe, FlaskConical, TestTube, Microscope, Users, BrainCircuit, LineChart, Network, Zap } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, LineChart, Network, Users, BrainCircuit, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { postLoginPathForRole } from '@/lib/auth/post-login-path';
 import { GhsMoney } from '@/components/ui/ghs-money';
 import { PharmaNewsTicker } from '@/components/marketing/pharma-news-ticker';
+import { HeroSection } from '@/components/hero/hero-section';
 
-function HeroBackground() {
-  const prefersReduced = useReducedMotion();
-  
-  if (prefersReduced) return null;
 
-  const icons = [
-    { Icon: Pill, color: 'var(--color-teal)', size: 48, initial: { x: -250, y: -100 }, animate: { y: [-100, -130, -100], rotate: [0, 15, -15, 0] }, delay: 0 },
-    { Icon: FlaskConical, color: 'var(--color-gold)', size: 64, initial: { x: 300, y: -150 }, animate: { y: [-150, -180, -150], rotate: [0, -10, 10, 0] }, delay: 1 },
-    { Icon: Syringe, color: 'var(--color-teal-light)', size: 56, initial: { x: 250, y: 150 }, animate: { y: [150, 120, 150], rotate: [45, 60, 30, 45] }, delay: 2 },
-    { Icon: Stethoscope, color: 'var(--color-teal-dark)', size: 72, initial: { x: -350, y: 100 }, animate: { y: [100, 70, 100], rotate: [-15, 0, -15] }, delay: 0.5 },
-    { Icon: TestTube, color: 'var(--color-gold)', size: 40, initial: { x: 0, y: 250 }, animate: { y: [250, 210, 250], rotate: [0, 20, -20, 0] }, delay: 1.5 },
-    { Icon: Microscope, color: 'var(--color-teal)', size: 80, initial: { x: -450, y: -50 }, animate: { y: [-50, -80, -50], rotate: [0, 5, -5, 0] }, delay: 2.5 },
-  ];
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 flex items-center justify-center opacity-40 dark:opacity-20">
-      {icons.map((item, i) => {
-        const { Icon, color, size, initial, animate, delay } = item;
-        return (
-          <motion.div
-            key={i}
-            className="absolute"
-            initial={initial}
-            animate={prefersReduced ? initial : animate}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: delay,
-            }}
-          >
-            <Icon size={size} style={{ color }} strokeWidth={1.5} />
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
-
-const HERO_WORDS = ["Compliance.", "Speed.", "Intelligence.", "Scale."];
 
 export default function LandingPage() {
   const router = useRouter();
   const prefersReduced = useReducedMotion();
-  const [wordIndex, setWordIndex] = useState(0);
-
   useEffect(() => {
     const { user, refreshToken } = useAuthStore.getState();
     if (user && refreshToken) {
       router.replace(postLoginPathForRole(user.role));
     }
   }, [router]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setWordIndex((prev) => (prev + 1) % HERO_WORDS.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 30 },
@@ -89,11 +43,11 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-transparent transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center gap-2 min-w-0">
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white shadow-lg" style={{ background: 'linear-gradient(135deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, #00838F 100%)' }}>
-              <Stethoscope size={18} />
+            <div className="flex items-center justify-center shrink-0">
+              <Image src="/azzay_logo.png" alt="Azzay Pharmacy" width={32} height={32} className="object-contain" />
             </div>
-            <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              PharmaPOS <span className="font-normal" style={{ color: 'var(--color-teal)' }}>Pro</span>
+            <span className="text-xl font-bold tracking-tight font-syne" style={{ color: 'var(--text-primary)' }}>
+              Azzay Pharmacy <span className="font-normal" style={{ color: 'var(--color-teal)' }}>Pro</span>
             </span>
           </div>
           <PharmaNewsTicker />
@@ -113,72 +67,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-6 overflow-hidden">
-        {/* Background Blobs */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-[100px] opacity-30 -z-10 translate-x-1/2 -translate-y-1/2" style={{ background: 'var(--color-teal)' }} />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full blur-[80px] opacity-30 -z-10 -translate-x-1/2 translate-y-1/2" style={{ background: 'var(--color-gold)' }} />
-        
-        <HeroBackground />
-
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <motion.div
-            initial={prefersReduced ? "visible" : "hidden"}
-            animate="visible"
-            variants={staggerContainer}
-          >
-            <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-8 shadow-sm backdrop-blur-sm" style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)' }}>
-              <span className="flex h-2 w-2 rounded-full animate-pulse" style={{ background: 'var(--color-teal)' }} />
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>The standard for African Pharmacies</span>
-            </motion.div>
-
-            <motion.div variants={fadeInUp}>
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-[1.1]" style={{ color: 'var(--text-primary)' }}>
-                Intelligent Pharmacy POS <br />
-                <span className="inline-flex flex-wrap justify-center items-center">
-                  Built for&nbsp;
-                  <span className="text-gradient-teal inline-grid text-left">
-                    <span className="invisible col-start-1 row-start-1">Compliance.</span>
-                    <AnimatePresence mode="popLayout">
-                      <motion.span
-                        key={wordIndex}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                        className="col-start-1 row-start-1"
-                      >
-                        {HERO_WORDS[wordIndex]}
-                      </motion.span>
-                    </AnimatePresence>
-                  </span>
-                </span>
-              </h1>
-            </motion.div>
-
-            <motion.p variants={fadeInUp} className="text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Automate FDA compliance, delight patients with digital receipts, predict stockouts with AI, and serve customers faster with a system built for extreme offline reliability.
-            </motion.p>
-            
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link 
-                href="/login"
-                className="group flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-4 rounded-2xl text-base font-semibold text-white transition-all active:scale-95"
-                style={{ background: 'linear-gradient(135deg, var(--color-teal-dark) 0%, var(--color-teal) 60%, #00838F 100%)', boxShadow: '0 8px 32px rgba(0,109,119,0.3)' }}
-              >
-                Launch Point of Sale
-                <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-              </Link>
-              <a 
-                href="#features"
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl text-base font-semibold border transition-all active:scale-95"
-                style={{ background: 'var(--surface-card)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
-              >
-                Explore Features
-              </a>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* Dramatic Features Grid */}
       <section id="features" className="py-32 px-6 relative overflow-hidden" style={{ background: 'var(--surface-base)' }}>

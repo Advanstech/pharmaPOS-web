@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Syne, DM_Mono, DM_Sans } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import { ApolloProvider } from '@/lib/apollo/apollo-provider';
@@ -7,6 +7,7 @@ import { LenisProvider } from '@/lib/lenis/lenis-provider';
 import { ThemeSync } from '@/components/theme-sync';
 import { ZoomSync } from '@/components/zoom-sync';
 import { ZoomWrapper } from '@/components/zoom-wrapper';
+import { ToastProvider, ConfirmProvider, PromptProvider } from '@/components/ui/toast';
 
 const THEME_INIT = `(function(){
   try {
@@ -47,16 +48,35 @@ const jetbrainsMono = JetBrains_Mono({
   adjustFontFallback: true,
 });
 
+const syne = Syne({
+  subsets: ['latin'],
+  variable: '--font-syne',
+  display: 'swap',
+});
+
+const dmMono = DM_Mono({
+  weight: ['400', '500'],
+  subsets: ['latin'],
+  variable: '--font-dm-mono',
+  display: 'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'PharmaPOS Pro - AI-Powered Pharmacy Management',
-    template: '%s | PharmaPOS Pro',
+    default: 'Azzay Pharmacy Pro - AI-Powered Pharmacy Management',
+    template: '%s | Azzay Pharmacy Pro',
   },
   description: 'AI-powered pharmacy POS for Azzay Pharmacy — Accra, Ghana. Lightning-fast offline POS, intelligent inventory, and FDA compliance built-in.',
-  keywords: ['PharmaPOS', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting', 'FDA compliance', 'offline POS'],
+  keywords: ['Azzay Pharmacy', 'pharmacy POS', 'Ghana pharmacy software', 'inventory', 'accounting', 'FDA compliance', 'offline POS'],
   authors: [{ name: 'Advansis Technologies' }],
   creator: 'Advansis Technologies',
   publisher: 'Advansis Technologies',
@@ -130,7 +150,7 @@ export default function RootLayout({
   return (
     <html 
       lang="en" 
-      className={`${inter.variable} ${jetbrainsMono.variable}`} 
+      className={`${inter.variable} ${jetbrainsMono.variable} ${syne.variable} ${dmMono.variable} ${dmSans.variable}`} 
       suppressHydrationWarning
     >
       <head>
@@ -150,11 +170,17 @@ export default function RootLayout({
         <ApolloProvider>
           <ThemeSync />
           <ZoomSync />
-          <LenisProvider>
-            <ZoomWrapper>
-              {children}
-            </ZoomWrapper>
-          </LenisProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <PromptProvider>
+                <LenisProvider>
+                  <ZoomWrapper>
+                    {children}
+                  </ZoomWrapper>
+                </LenisProvider>
+              </PromptProvider>
+            </ConfirmProvider>
+          </ToastProvider>
         </ApolloProvider>
       </body>
     </html>

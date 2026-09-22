@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchX, BrainCircuit, Package, Send, X, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { aiFetch } from '@/lib/ai/fetch-with-auth';
 
 interface NoResultsProps {
   query: string;
@@ -25,10 +26,8 @@ export function NoResults({ query }: NoResultsProps) {
     if (aiSummary || aiLoading) return;
     setAiLoading(true);
     try {
-      const res = await fetch('/api/drug-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: query, genericName: '', classification: 'OTC' }),
+      const res = await aiFetch('/api/drug-intelligence', {
+        name: query, genericName: '', classification: 'OTC',
       });
       if (res.ok) {
         const data = await res.json() as { whatItDoes?: string; genericName?: string; localAlternatives?: string[] };

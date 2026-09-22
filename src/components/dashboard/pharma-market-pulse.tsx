@@ -8,6 +8,7 @@ import {
   GraduationCap,
   HeartPulse,
   Sparkles,
+  Bookmark,
 } from 'lucide-react';
 import { PHARMA_MARKET_FALLBACK, PHARMA_NEWS_FALLBACK } from '@/lib/pharma-news/fallback-headlines';
 import { stripHtmlNewsTitle } from '@/lib/pharma-news/sanitize-news-item';
@@ -71,6 +72,8 @@ interface PharmaMarketPulseProps {
   initialArticle?: string | null;
 }
 
+const BOOKMARKS_KEY = 'pharmapos-news-bookmarks';
+
 export function PharmaMarketPulse({ layout = 'feature', initialArticle }: PharmaMarketPulseProps) {
   const prefersReduced = useReducedMotion();
   const [items, setItems] = useState<PharmaNewsItem[]>(LOCAL_FALLBACK);
@@ -78,6 +81,38 @@ export function PharmaMarketPulse({ layout = 'feature', initialArticle }: Pharma
   const [loading, setLoading] = useState(true);
   const [spotlight, setSpotlight] = useState(0);
   const [pauseRotate, setPauseRotate] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+
+  // Load bookmarks from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(BOOKMARKS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        setBookmarks(new Set(parsed));
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  // Persist bookmarks
+  const toggleBookmark = useCallback((title: string) => {
+    setBookmarks(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      try {
+        localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...next]));
+      } catch {
+        // Ignore localStorage errors
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,33 +357,66 @@ export function PharmaMarketPulse({ layout = 'feature', initialArticle }: Pharma
                       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <p className="text-lg font-bold leading-snug text-content-primary sm:text-xl">{current.title}</p>
-                      {current.url && (
-                        <a
-                          href={current.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-teal hover:underline"
+                      <div className="mt-4 flex items-center gap-3">
+                        {current.url && (
+                          <a
+                            href={current.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm font-bold text-teal hover:underline"
+                          >
+                            Read source
+                            <ExternalLink className="h-4 w-4" aria-hidden />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => toggleBookmark(current.title)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition-colors"
+                          style={{
+                            background: bookmarks.has(current.title) ? 'rgba(0,109,119,0.12)' : 'var(--surface-card)',
+                            color: bookmarks.has(current.title) ? 'var(--color-teal)' : 'var(--text-muted)',
+                            border: '1px solid var(--surface-border)',
+                          }}
                         >
-                          Read source
-                          <ExternalLink className="h-4 w-4" aria-hidden />
-                        </a>
-                      )}
+                          <Bookmark className="h-3.5 w-3.5" fill={bookmarks.has(current.title) ? 'currentColor' : 'none'} />
+                          {bookmarks.has(current.title) ? 'Saved' : 'Save'}
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
               <p className="relative z-10 mt-6 text-[11px] font-medium text-content-muted">
                 Spotlight rotates automatically — hover to pause. Not financial or medical advice.
+                {bookmarks.size > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{ background: 'rgba(0,109,119,0.1)', color: 'var(--color-teal-dark)' }}>
+                    <Bookmark className="h-3 w-3" />
+                    {bookmarks.size} saved
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="lg:col-span-7">
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-content-muted">More headlines</p>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-content-muted">More headlines</p>
+                {bookmarks.size > 0 && (
+                  <button
+                    onClick={() => setPauseRotate(!pauseRotate)}
+                    className="text-[10px] font-semibold hover:underline"
+                    style={{ color: 'var(--color-teal)' }}
+                  >
+                    {pauseRotate ? 'Resume rotation' : 'Viewing saved'}
+                  </button>
+                )}
+              </div>
               <ul className="max-h-[min(340px,52vh)] space-y-2 overflow-y-auto pr-1">
                 {items.map((item, i) => {
                   const meta = CATEGORY_META[item.category];
                   const CatIcon = meta.Icon;
                   const isActive = i === spotlight;
+                  const isBookmarked = bookmarks.has(item.title);
                   return (
                     <li key={`${i}-${item.title.slice(0, 40)}`}>
                       <div
@@ -369,6 +437,15 @@ export function PharmaMarketPulse({ layout = 'feature', initialArticle }: Pharma
                             <CatIcon className="h-4 w-4" aria-hidden />
                           </span>
                           <span className="line-clamp-2 text-sm font-semibold text-content-primary">{item.title}</span>
+                        </button>
+                        <button
+                          onClick={() => toggleBookmark(item.title)}
+                          className={`flex shrink-0 items-center border-l border-surface-border px-3 transition-colors ${
+                            isBookmarked ? 'text-teal bg-teal/5' : 'text-content-muted hover:bg-surface-hover'
+                          }`}
+                          aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+                        >
+                          <Bookmark className="h-4 w-4" fill={isBookmarked ? 'currentColor' : 'none'} />
                         </button>
                         {item.url ? (
                           <a

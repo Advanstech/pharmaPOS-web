@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import Link from 'next/link';
 import {
   UserPlus, MoreVertical, ShieldOff, KeyRound, LogIn, PencilLine, Eye,
   LayoutGrid, List, Search, Filter, X, Wifi, WifiOff, Clock, Building2,
@@ -20,6 +21,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { formatAccraDate, cn } from '@/lib/utils';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchFieldWithClear } from '@/components/ui/search-field-with-clear';
+import { useToast, useConfirm, usePrompt } from '@/components/ui/toast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -539,6 +541,9 @@ function FilterBar({
 
 export default function StaffPage() {
   const { user } = useAuthStore();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm } = useConfirm();
+  const { prompt } = usePrompt();
   const shouldReduceMotion = useReducedMotion();
   const [tab, setTab] = useState<'roster' | 'activity'>('roster');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -618,17 +623,25 @@ export default function StaffPage() {
   useEffect(() => { setActivityPage(1); }, [tab]);
 
   function handleResetPw(member: StaffMember) {
-    const value = window.prompt(`New password for ${member.name} (min 8 chars):`);
-    const pw = value?.trim();
-    if (!pw || pw.length < 8) return;
-    void resetPassword({ variables: { input: { userId: member.id, newPassword: pw } } })
-      .then(() => window.alert(`Password reset for ${member.name}.`))
-      .catch((err: unknown) => window.alert(err instanceof Error ? err.message : 'Reset failed.'));
+    void (async () => {
+      const value = await prompt({ title: `Reset password for ${member.name}`, placeholder: 'New password (min 8 chars)', required: true, confirmLabel: 'Reset Password' });
+      const pw = value?.trim();
+      if (!pw || pw.length < 8) return;
+      try {
+        await resetPassword({ variables: { input: { userId: member.id, newPassword: pw } } });
+        toastSuccess(`Password reset for ${member.name}`);
+      } catch (err: unknown) {
+        toastError('Reset failed', err instanceof Error ? err.message : 'Unknown error');
+      }
+    })();
   }
 
   function handleDeactivate(member: StaffMember) {
-    if (!window.confirm(`Deactivate ${member.name}? They will be logged out immediately.`)) return;
-    void deactivate({ variables: { userId: member.id } });
+    void (async () => {
+      const ok = await confirm({ title: `Deactivate ${member.name}?`, message: 'They will be logged out immediately and cannot sign in.', confirmLabel: 'Deactivate', danger: true });
+      if (!ok) return;
+      void deactivate({ variables: { userId: member.id } });
+    })();
   }
 
   return (
@@ -1143,11 +1156,11 @@ function ActivityTab({ sessions, loading, error, showBranchColumn, page, hasNext
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <a href={`/dashboard/staff/${row.userId}`}
+                      <Link href={`/dashboard/staff/${row.userId}`}
                         className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all hover:scale-105"
                         style={{ background: 'rgba(0,109,119,0.08)', color: 'var(--color-teal)' }}>
                         <Eye size={11} /> View
-                      </a>
+                      </Link>
                     </td>
                   </tr>
                 );
